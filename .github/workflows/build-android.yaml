@@ -19,6 +19,16 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Ensure Submodules Cloned
+        run: |
+          git submodule sync
+          git submodule update --init --recursive || true
+          if [ ! -f "core/Clash.Meta/go.mod" ]; then
+            echo "Cloning Clash.Meta fallback..."
+            rm -rf core/Clash.Meta
+            git clone --depth 1 -b FlClash https://github.com/chen08209/Clash.Meta.git core/Clash.Meta
+          fi
+
       - name: Setup Java JDK
         uses: actions/setup-java@v4
         with:
