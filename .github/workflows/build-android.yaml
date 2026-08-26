@@ -61,6 +61,9 @@ jobs:
 
       - name: Build Android APKs
         run: |
+          chmod -R +x plugins/ || true
+          chmod -R +x tool/ || true
+          find . -name "*.sh" -exec chmod +x {} +
           dart setup.dart android -v
 
       - name: Rename, Sign and Verify APKs
