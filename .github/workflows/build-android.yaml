@@ -41,6 +41,17 @@ jobs:
           go-version: '1.24'
           cache-dependency-path: core/go.sum
 
+      - name: Prepare Go Dependencies
+        run: |
+          cd core
+          go mod tidy
+          if [ -d "Clash.Meta" ]; then
+            cd Clash.Meta
+            go mod tidy || true
+            cd ..
+          fi
+          cd ..
+
       - name: Setup NDK
         uses: nttld/setup-ndk@v1
         with:
