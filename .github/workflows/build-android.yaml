@@ -1,0 +1,107 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    name: Build Android APKs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: core/go.sum
+
+      - name: Setup NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r28c
+          add-to-path: true
+          link-to-sdk: true
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: master
+          flutter-version: '3.44.4'
+          cache: true
+
+      - name: Create Keystore and Signing Properties
+        run: |
+          keytool -genkey -v -keystore android/app/keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias eavevpn -storepass android -keypass android -dname "CN=Kirillo4ka, OU=EaveVPN, O=EaveVPN, L=City, S=State, C=RU"
+          cat <<EOF > android/local.properties
+          keyAlias=eavevpn
+          storePassword=android
+          keyPassword=android
+          EOF
+
+      - name: Install Dependencies
+        run: |
+          flutter pub get
+          dart pub get
+
+      - name: Build Android APKs
+        run: |
+          dart setup.dart android -v
+
+      - name: Rename, Sign and Verify APKs
+        run: |
+          mkdir -p output_apks
+          APKSIGNER=$(find $ANDROID_HOME/build-tools/ -name apksigner | sort -V | tail -n 1)
+          echo "Using apksigner: $APKSIGNER"
+
+          for apk in $(find dist/ build/app/outputs/flutter-apk/ -name "*.apk"); do
+            base=$(basename "$apk")
+            if [[ "$base" == *"arm64-v8a"* ]]; then
+              target="output_apks/EaveVPN-v1.0.0-Android-arm64-v8a.apk"
+            elif [[ "$base" == *"armeabi-v7a"* ]]; then
+              target="output_apks/EaveVPN-v1.0.0-Android-armeabi-v7a.apk"
+            elif [[ "$base" == *"x86_64"* ]]; then
+              target="output_apks/EaveVPN-v1.0.0-Android-x86_64.apk"
+            else
+              target="output_apks/EaveVPN-v1.0.0-Android-universal.apk"
+            fi
+            
+            cp "$apk" "$target"
+            echo "Signing $target with V1+V2+V3 schemes..."
+            $APKSIGNER sign --ks android/app/keystore.jks --ks-pass pass:android --ks-key-alias eavevpn --key-pass pass:android --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true --v4-signing-enabled false "$target"
+            $APKSIGNER verify --verbose "$target"
+          done
+          ls -la output_apks/
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: EaveVPN-Android-APKs
+          path: output_apks/*.apk
+          if-no-files-found: error
+
+      - name: Upload APKs to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          if [[ "$TAG" == refs/* || -z "$TAG" ]]; then
+            TAG="v1.0.0"
+          fi
+          echo "Uploading to Release tag: $TAG"
+          gh release upload "$TAG" output_apks/*.apk --clobber || gh release create "$TAG" output_apks/*.apk --title "EaveVPN $TAG" --notes "EaveVPN Client Release"

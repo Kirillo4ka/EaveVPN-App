@@ -1,0 +1,14 @@
+repos:
+  - repo: local
+    hooks:
+      - id: dart-format
+        name: dart format
+        entry: dart format
+        language: system
+        files: \.dart$
+      - id: flutter-analyze
+        name: flutter analyze (pre-push)
+        entry: flutter analyze --no-fatal-infos
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

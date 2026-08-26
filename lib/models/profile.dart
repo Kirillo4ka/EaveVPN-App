@@ -1,0 +1,331 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:fl_clash/common/common.dart';
+import 'package:fl_clash/core/controller.dart';
+import 'package:fl_clash/enum/enum.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import 'clash_config.dart';
+import 'proxy_parser.dart';
+
+part 'generated/profile.freezed.dart';
+part 'generated/profile.g.dart';
+
+@freezed
+abstract class SubscriptionInfo with _$SubscriptionInfo {
+  const factory SubscriptionInfo({
+    @Default(0) int upload,
+    @Default(0) int download,
+    @Default(0) int total,
+    @Default(0) int expire,
+  }) = _SubscriptionInfo;
+
+  factory SubscriptionInfo.fromJson(Map<String, Object?> json) =>
+      _$SubscriptionInfoFromJson(json);
+
+  factory SubscriptionInfo.formHString(String? info) {
+    if (info == null) return const SubscriptionInfo();
+    final list = info.split(';');
+    final Map<String, int?> map = {};
+    for (final i in list) {
+      final keyValue = i.trim().split('=');
+      map[keyValue[0]] = int.tryParse(keyValue[1]);
+    }
+    return SubscriptionInfo(
+      upload: map['upload'] ?? 0,
+      download: map['download'] ?? 0,
+      total: map['total'] ?? 0,
+      expire: map['expire'] ?? 0,
+    );
+  }
+}
+
+@freezed
+abstract class Profile with _$Profile {
+  const factory Profile({
+    required int id,
+    @Default('') String label,
+    String? currentGroupName,
+    @Default('') String url,
+    DateTime? lastUpdateDate,
+    required Duration autoUpdateDuration,
+    SubscriptionInfo? subscriptionInfo,
+    @Default(true) bool autoUpdate,
+    @Default({}) Map<String, String> selectedMap,
+    @Default({}) Set<String> unfoldSet,
+    @Default(OverwriteType.standard) OverwriteType overwriteType,
+    int? scriptId,
+    int? order,
+  }) = _Profile;
+
+  factory Profile.fromJson(Map<String, Object?> json) =>
+      _$ProfileFromJson(json);
+
+  factory Profile.normal({String? label, String url = ''}) {
+    final id = snowflake.id;
+    return Profile(
+      label: label ?? '',
+      url: url,
+      id: id,
+      autoUpdateDuration: defaultUpdateDuration,
+    );
+  }
+}
+
+@freezed
+abstract class ProfileRuleLink with _$ProfileRuleLink {
+  const factory ProfileRuleLink({
+    int? profileId,
+    required int ruleId,
+    RuleScene? scene,
+    String? order,
+  }) = _ProfileRuleLink;
+}
+
+extension ProfileRuleLinkExt on ProfileRuleLink {
+  String get key {
+    final splits = <String?>[
+      profileId?.toString(),
+      ruleId.toString(),
+      scene?.name,
+    ];
+    return splits.where((item) => item != null).join('_');
+  }
+}
+
+@freezed
+abstract class StandardOverwrite with _$StandardOverwrite {
+  const factory StandardOverwrite({
+    @Default([]) List<Rule> addedRules,
+    @Default([]) List<int> disabledRuleIds,
+  }) = _StandardOverwrite;
+
+  factory StandardOverwrite.fromJson(Map<String, Object?> json) =>
+      _$StandardOverwriteFromJson(json);
+}
+
+@freezed
+abstract class ScriptOverwrite with _$ScriptOverwrite {
+  const factory ScriptOverwrite({int? scriptId}) = _ScriptOverwrite;
+
+  factory ScriptOverwrite.fromJson(Map<String, Object?> json) =>
+      _$ScriptOverwriteFromJson(json);
+}
+
+extension ProfilesExt on List<Profile> {
+  Profile? getProfile(int? profileId) {
+    final index = indexWhere((profile) => profile.id == profileId);
+    return index == -1 ? null : this[index];
+  }
+
+  String _getLabel(String label, int id) {
+    final realLabel = label.takeFirstValid([id.toString()]);
+    final hasDup =
+        indexWhere(
+          (element) => element.label == realLabel && element.id != id,
+        ) !=
+        -1;
+    if (hasDup) {
+      return _getLabel(utils.getOverwriteLabel(realLabel), id);
+    } else {
+      return label;
+    }
+  }
+
+  Profile optimizeLabel(Profile profile) {
+    return profile.copyWith(label: _getLabel(profile.label, profile.id));
+  }
+}
+
+extension ProfileExtension on Profile {
+  ProfileType get type =>
+      url.isEmpty == true ? ProfileType.file : ProfileType.url;
+
+  bool get realAutoUpdate => url.isEmpty == true ? false : autoUpdate;
+
+  String get realLabel => label.takeFirstValid([id.toString()]);
+
+  String get fileName => '$id.yaml';
+
+  String get updatingKey => 'profile_$id';
+
+  Future<Profile?> checkAndUpdateAndCopy() async {
+    final mFile = await _getFile(false);
+    final isExists = await mFile.exists();
+    if (isExists || url.isEmpty) {
+      return null;
+    }
+    return update();
+  }
+
+  Future<File> _getFile([bool autoCreate = true]) async {
+    final path = await appPath.getProfilePath(id.toString());
+    final file = File(path);
+    final isExists = await file.exists();
+    if (!isExists && autoCreate) {
+      return file.create(recursive: true);
+    }
+    return file;
+  }
+
+  Future<File> get file async {
+    return _getFile();
+  }
+
+  Future<Profile> update() async {
+    final proxyProtocols = ['vmess://', 'vless://', 'trojan://', 'ss://', 'hysteria://', 'hysteria2://', 'hy2://', 'tuic://'];
+    final trimmedUrl = url.trim();
+
+    // If URL itself is a raw proxy URI, convert directly without HTTP download
+    final isRawProxyLink = proxyProtocols.any((p) => trimmedUrl.toLowerCase().startsWith(p));
+    if (isRawProxyLink) {
+      final lines = trimmedUrl
+          .split(RegExp(r'[\r\n]+'))
+          .map((l) => l.trim())
+          .where((l) => l.isNotEmpty && !l.startsWith('#'))
+          .toList();
+      final rawProxies = lines.where((l) => proxyProtocols.any((p) => l.toLowerCase().startsWith(p))).toList();
+      final yaml = convertProxyUrisToMihomoYaml(rawProxies);
+      if (yaml.isNotEmpty) {
+        return copyWith(label: label.takeFirstValid([id.toString()]))
+            .saveFile(Uint8List.fromList(utf8.encode(yaml)));
+      }
+    }
+
+    final response = await request.getFileResponseForUrl(url);
+    final rawData = response.data ?? Uint8List.fromList([]);
+    final disposition = response.headers.value('content-disposition');
+    final userinfo = response.headers.value('subscription-userinfo');
+    final headerTitle = response.headers.value('profile-title') ?? response.headers.value('subscription-title');
+
+    final extractedTitle = _extractProfileTitle(rawData, headerTitle, disposition, url);
+    final newLabel = label.takeFirstValid([
+      extractedTitle,
+      id.toString(),
+    ]);
+
+    return copyWith(
+      label: newLabel,
+      subscriptionInfo: SubscriptionInfo.formHString(userinfo),
+    ).saveFile(rawData);
+  }
+
+  static String _extractProfileTitle(Uint8List bytes, String? headerTitle, String? disposition, String url) {
+    if (headerTitle != null && headerTitle.trim().isNotEmpty) {
+      try {
+        return Uri.decodeComponent(headerTitle.trim());
+      } catch (_) {
+        return headerTitle.trim();
+      }
+    }
+
+    final dispName = utils.getFileNameForDisposition(disposition);
+    if (dispName != null && dispName.isNotEmpty) {
+      return dispName;
+    }
+
+    try {
+      String text = utf8.decode(bytes, allowMalformed: true).trim();
+      try {
+        final decodedB64 = utf8.decode(base64.decode(text), allowMalformed: true);
+        if (decodedB64.isNotEmpty) text = decodedB64;
+      } catch (_) {}
+
+      for (final line in text.split(RegExp(r'[\r\n]+'))) {
+        final t = line.trim();
+        if (t.toLowerCase().startsWith('# profile-title:') || t.toLowerCase().startsWith('#profile-title:')) {
+          final colonIdx = t.indexOf(':');
+          final title = t.substring(colonIdx + 1).trim();
+          if (title.isNotEmpty) return title;
+        }
+        if (t.toLowerCase().startsWith('# title:') || t.toLowerCase().startsWith('#title:')) {
+          final colonIdx = t.indexOf(':');
+          final title = t.substring(colonIdx + 1).trim();
+          if (title.isNotEmpty) return title;
+        }
+        if (t.toLowerCase().startsWith('# name:') || t.toLowerCase().startsWith('#name:')) {
+          final colonIdx = t.indexOf(':');
+          final title = t.substring(colonIdx + 1).trim();
+          if (title.isNotEmpty) return title;
+        }
+      }
+    } catch (_) {}
+
+    try {
+      final uri = Uri.tryParse(url);
+      if (uri != null && uri.pathSegments.isNotEmpty) {
+        var lastSeg = uri.pathSegments.lastWhere((s) => s.isNotEmpty, orElse: () => '');
+        if (lastSeg.isNotEmpty) {
+          if (lastSeg.endsWith('.txt') || lastSeg.endsWith('.yaml') || lastSeg.endsWith('.yml')) {
+            lastSeg = lastSeg.substring(0, lastSeg.lastIndexOf('.'));
+          }
+          return Uri.decodeComponent(lastSeg);
+        }
+      }
+    } catch (_) {}
+
+    return '';
+  }
+
+  Future<Profile> saveFile(Uint8List bytes) async {
+    final path = await appPath.tempFilePath;
+    final tempFile = File(path);
+
+    // Smart converter for raw proxy links / base64 subscriptions / text with proxy links
+    Uint8List processedBytes = bytes;
+    try {
+      String content = utf8.decode(bytes, allowMalformed: true).trim();
+      String decodedText = content;
+      try {
+        decodedText = utf8.decode(base64.decode(content), allowMalformed: true);
+      } catch (_) {}
+
+      final proxyProtocols = ['vmess://', 'vless://', 'trojan://', 'ss://', 'hysteria://', 'hysteria2://', 'hy2://', 'tuic://'];
+      final lines = decodedText
+          .split(RegExp(r'[\r\n]+'))
+          .map((l) => l.trim())
+          .toList();
+      final rawProxies = lines
+          .where((l) => proxyProtocols.any((p) => l.toLowerCase().startsWith(p)))
+          .toList();
+
+      if (rawProxies.isNotEmpty) {
+        final yaml = convertProxyUrisToMihomoYaml(lines);
+        if (yaml.isNotEmpty) {
+          processedBytes = Uint8List.fromList(utf8.encode(yaml));
+        }
+      } else {
+        final enhancedYaml = enhanceMihomoProfileYaml(content);
+        processedBytes = Uint8List.fromList(utf8.encode(enhancedYaml));
+      }
+    } catch (_) {}
+
+    await tempFile.safeWriteAsBytes(processedBytes);
+    final message = await coreController.validateConfig(path);
+    if (message.isNotEmpty) {
+      throw message;
+    }
+    final mFile = await file;
+    await tempFile.copy(mFile.path);
+    await tempFile.safeDelete();
+    return copyWith(lastUpdateDate: DateTime.now());
+  }
+
+  Future<Profile> saveFileWithPath(String path) async {
+    try {
+      final content = await File(path).readAsString();
+      final enhanced = enhanceMihomoProfileYaml(content);
+      await File(path).writeAsString(enhanced);
+    } catch (_) {}
+    final message = await coreController.validateConfig(path);
+    if (message.isNotEmpty) {
+      throw message;
+    }
+    final mFile = await file;
+    await File(path).copy(mFile.path);
+    return copyWith(lastUpdateDate: DateTime.now());
+  }
+}
+
