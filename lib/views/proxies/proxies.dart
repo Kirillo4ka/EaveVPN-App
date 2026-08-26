@@ -1,6 +1,7 @@
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/common.dart';
+import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/models/state.dart';
 import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/views/proxies/list.dart';
@@ -123,6 +124,157 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
     );
   }
 
+  Widget _buildModeSelector(BuildContext context) {
+    final profiles = ref.watch(profilesProvider);
+    final currentProfileId = ref.watch(currentProfileIdProvider);
+
+    Profile? vpnProfile;
+    Profile? unblockProfile;
+    for (final p in profiles) {
+      if (p.label == 'VPN') vpnProfile = p;
+      if (p.label == 'Обход блокировок') unblockProfile = p;
+    }
+
+    if (vpnProfile == null && unblockProfile == null) {
+      return const SizedBox.shrink();
+    }
+
+    final selectedId =
+        currentProfileId ?? vpnProfile?.id ?? unblockProfile?.id ?? '';
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest
+            .withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          if (vpnProfile != null)
+            Expanded(
+              child: _buildModeTab(
+                context: context,
+                label: 'VPN',
+                subtitle: 'Все сайты',
+                icon: Icons.vpn_lock,
+                isSelected: selectedId == vpnProfile.id,
+                onTap: () {
+                  if (selectedId != vpnProfile!.id) {
+                    ref.read(currentProfileIdProvider.notifier).value =
+                        vpnProfile.id;
+                    ref
+                        .read(setupActionProvider.notifier)
+                        .applyProfileDebounce();
+                  }
+                },
+              ),
+            ),
+          if (vpnProfile != null && unblockProfile != null)
+            const SizedBox(width: 8),
+          if (unblockProfile != null)
+            Expanded(
+              child: _buildModeTab(
+                context: context,
+                label: 'Обход блокировок',
+                subtitle: 'Умный режим',
+                icon: Icons.shield_outlined,
+                isSelected: selectedId == unblockProfile.id,
+                onTap: () {
+                  if (selectedId != unblockProfile!.id) {
+                    ref.read(currentProfileIdProvider.notifier).value =
+                        unblockProfile.id;
+                    ref
+                        .read(setupActionProvider.notifier)
+                        .applyProfileDebounce();
+                  }
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeTab({
+    required BuildContext context,
+    required String label,
+    required String subtitle,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? theme.colorScheme.primaryContainer
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: isSelected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight:
+                          isSelected ? FontWeight.bold : FontWeight.w500,
+                      color: isSelected
+                          ? theme.colorScheme.onPrimaryContainer
+                          : theme.colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: 10,
+                      color: isSelected
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.outline,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final proxiesType = ref.watch(
@@ -136,10 +288,17 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
       actions: _buildActions(context),
       title: context.appLocalizations.proxies,
       searchState: AppBarSearchState(onSearch: _onSearch),
-      body: switch (proxiesType) {
-        ProxiesType.tab => ProxiesTabView(key: _proxiesTabKey),
-        ProxiesType.list => const ProxiesListView(),
-      },
+      body: Column(
+        children: [
+          _buildModeSelector(context),
+          Expanded(
+            child: switch (proxiesType) {
+              ProxiesType.tab => ProxiesTabView(key: _proxiesTabKey),
+              ProxiesType.list => const ProxiesListView(),
+            },
+          ),
+        ],
+      ),
     );
   }
 }

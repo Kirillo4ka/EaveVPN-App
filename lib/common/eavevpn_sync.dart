@@ -9,8 +9,10 @@ import 'package:http/http.dart' as http;
 
 class EaveVpnSync {
   static const String secretKeyStr = 'eavevpn_secure_master_token_key_2026_x77!';
-  static const String configUrl =
-      'https://raw.githubusercontent.com/Kirillo4ka/configs-EaveVPN-app/main/eavevpn_servers.enc';
+  static const String vpnUrl =
+      'https://raw.githubusercontent.com/Kirillo4ka/configs-EaveVPN-app/main/eavevpn_vpn.enc';
+  static const String unblockUrl =
+      'https://raw.githubusercontent.com/Kirillo4ka/configs-EaveVPN-app/main/eavevpn_unblock.enc';
 
   // Obfuscated GitHub Token for private config repository access
   static final List<int> _tokenBytes = [
@@ -70,10 +72,14 @@ class EaveVpnSync {
     return utf8.decode(decryptedBytes);
   }
 
-  static Future<bool> syncConfigs({bool force = false}) async {
+  static Future<Profile?> _syncSingleProfile({
+    required String label,
+    required String url,
+    bool selectIfNone = false,
+  }) async {
     try {
       final response = await http.get(
-        Uri.parse(configUrl),
+        Uri.parse(url),
         headers: {
           'Authorization': 'token $_token',
           'User-Agent': 'EaveVPN-Client/1.0',
@@ -81,15 +87,14 @@ class EaveVpnSync {
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200) {
-        return false;
+        return null;
       }
 
       final decryptedContent = decryptEncryptedConfig(response.bodyBytes);
       if (decryptedContent.trim().isEmpty) {
-        return false;
+        return null;
       }
 
-      // Convert raw nodes into Clash YAML
       final lines = decryptedContent
           .split('\n')
           .map((e) => e.trim())
@@ -97,46 +102,70 @@ class EaveVpnSync {
           .toList();
       final clashYaml = convertProxyUrisToMihomoYaml(lines);
       if (clashYaml.trim().isEmpty) {
-        return false;
+        return null;
       }
 
       final ref = globalState.container;
       final profiles = ref.read(profilesProvider);
-      Profile? eaveProfile;
+      Profile? existingProfile;
       for (final p in profiles) {
-        if (p.label == 'EaveVPN Official') {
-          eaveProfile = p;
+        if (p.label == label) {
+          existingProfile = p;
           break;
         }
       }
 
       final yamlBytes = Uint8List.fromList(utf8.encode(clashYaml));
-
-      if (eaveProfile == null) {
-        // Create new profile
-        final baseProfile = Profile.normal(
-          label: 'EaveVPN Official',
-          url: configUrl,
-        );
-        final savedProfile = await baseProfile.saveFile(yamlBytes);
-        ref.read(profilesProvider.notifier).put(savedProfile);
-        ref.read(currentProfileIdProvider.notifier).value = savedProfile.id;
-        ref.read(setupActionProvider.notifier).applyProfileDebounce();
+      Profile finalProfile;
+      if (existingProfile == null) {
+        final baseProfile = Profile.normal(label: label, url: url);
+        finalProfile = await baseProfile.saveFile(yamlBytes);
+        ref.read(profilesProvider.notifier).put(finalProfile);
       } else {
-        // Update existing profile file
-        final updatedProfile = await eaveProfile.saveFile(yamlBytes);
-        ref.read(profilesProvider.notifier).put(updatedProfile);
-        if (ref.read(currentProfileIdProvider) == eaveProfile.id) {
-          ref.read(setupActionProvider.notifier).applyProfileDebounce(silence: true);
-        } else {
-          ref.read(currentProfileIdProvider.notifier).value = eaveProfile.id;
-          ref.read(setupActionProvider.notifier).applyProfileDebounce();
-        }
+        finalProfile = await existingProfile.saveFile(yamlBytes);
+        ref.read(profilesProvider.notifier).put(finalProfile);
       }
 
-      return true;
+      final currentId = ref.read(currentProfileIdProvider);
+      if (currentId == null || selectIfNone) {
+        if (currentId != finalProfile.id) {
+          ref.read(currentProfileIdProvider.notifier).value = finalProfile.id;
+          ref.read(setupActionProvider.notifier).applyProfileDebounce();
+        }
+      } else if (currentId == finalProfile.id) {
+        ref.read(setupActionProvider.notifier).applyProfileDebounce(silence: true);
+      }
+
+      return finalProfile;
     } catch (e) {
-      commonPrint.log('EaveVpnSync error: $e');
+      commonPrint.log('EaveVpnSync error for $label: $e');
+      return null;
+    }
+  }
+
+  static Future<bool> syncConfigs({bool force = false}) async {
+    try {
+      final ref = globalState.container;
+      final currentId = ref.read(currentProfileIdProvider);
+      final hasActive = currentId != null;
+
+      // 1. Sync VPN Profile (Whitelist)
+      final vpnProfile = await _syncSingleProfile(
+        label: 'VPN',
+        url: vpnUrl,
+        selectIfNone: !hasActive,
+      );
+
+      // 2. Sync Unblock Profile (Blacklist)
+      final unblockProfile = await _syncSingleProfile(
+        label: 'Обход блокировок',
+        url: unblockUrl,
+        selectIfNone: false,
+      );
+
+      return vpnProfile != null || unblockProfile != null;
+    } catch (e) {
+      commonPrint.log('EaveVpnSync overall error: $e');
       return false;
     }
   }
