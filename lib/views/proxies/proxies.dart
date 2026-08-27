@@ -28,6 +28,34 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
   List<Widget> _buildActions(BuildContext context) {
     final appLocalizations = context.appLocalizations;
     return [
+      ValueListenableBuilder<bool>(
+        valueListenable: EaveVpnSync.isSyncingNotifier,
+        builder: (context, isSyncing, _) {
+          return IconButton(
+            tooltip: 'Обновить серверы',
+            onPressed: isSyncing
+                ? null
+                : () async {
+                    final res = await EaveVpnSync.syncConfigs(force: true);
+                    if (context.mounted && res) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Конфигурации успешно обновлены!'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  },
+            icon: isSyncing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.sync),
+          );
+        },
+      ),
       if (_isTab)
         IconButton(
           onPressed: () {
@@ -152,48 +180,68 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
             .withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          if (vpnProfile != null)
-            Expanded(
-              child: _buildModeTab(
-                context: context,
-                label: 'VPN',
-                subtitle: 'Все сайты',
-                icon: Icons.vpn_lock,
-                isSelected: selectedId == vpnProfile.id,
-                onTap: () {
-                  if (selectedId != vpnProfile!.id) {
-                    ref.read(currentProfileIdProvider.notifier).value =
-                        vpnProfile.id;
-                    ref
-                        .read(setupActionProvider.notifier)
-                        .applyProfileDebounce();
-                  }
-                },
-              ),
+          Row(
+            children: [
+              if (vpnProfile != null)
+                Expanded(
+                  child: _buildModeTab(
+                    context: context,
+                    label: 'VPN',
+                    subtitle: 'Все сайты',
+                    icon: Icons.vpn_lock,
+                    isSelected: selectedId == vpnProfile.id,
+                    onTap: () {
+                      if (selectedId != vpnProfile!.id) {
+                        ref.read(currentProfileIdProvider.notifier).value =
+                            vpnProfile.id;
+                        ref
+                            .read(setupActionProvider.notifier)
+                            .applyProfileDebounce();
+                      }
+                    },
+                  ),
+                ),
+              if (vpnProfile != null && unblockProfile != null)
+                const SizedBox(width: 8),
+              if (unblockProfile != null)
+                Expanded(
+                  child: _buildModeTab(
+                    context: context,
+                    label: 'Обход блокировок',
+                    subtitle: 'Умный режим',
+                    icon: Icons.shield_outlined,
+                    isSelected: selectedId == unblockProfile.id,
+                    onTap: () {
+                      if (selectedId != unblockProfile!.id) {
+                        ref.read(currentProfileIdProvider.notifier).value =
+                            unblockProfile.id;
+                        ref
+                            .read(setupActionProvider.notifier)
+                            .applyProfileDebounce();
+                      }
+                    },
+                  ),
+                ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 2),
+            child: ValueListenableBuilder<DateTime?>(
+              valueListenable: EaveVpnSync.lastSyncNotifier,
+              builder: (context, _, _) {
+                return Text(
+                  '⚡ ${EaveVpnSync.getLastSyncText()} (автообновление каждый час)',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontSize: 10.5,
+                    color: Theme.of(context).colorScheme.outline,
+                  ),
+                );
+              },
             ),
-          if (vpnProfile != null && unblockProfile != null)
-            const SizedBox(width: 8),
-          if (unblockProfile != null)
-            Expanded(
-              child: _buildModeTab(
-                context: context,
-                label: 'Обход блокировок',
-                subtitle: 'Умный режим',
-                icon: Icons.shield_outlined,
-                isSelected: selectedId == unblockProfile.id,
-                onTap: () {
-                  if (selectedId != unblockProfile!.id) {
-                    ref.read(currentProfileIdProvider.notifier).value =
-                        unblockProfile.id;
-                    ref
-                        .read(setupActionProvider.notifier)
-                        .applyProfileDebounce();
-                  }
-                },
-              ),
-            ),
+          ),
         ],
       ),
     );
@@ -281,6 +329,8 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
       proxiesStyleSettingProvider.select((state) => state.type),
     );
     final isLoading = ref.watch(loadingProvider(LoadingTag.proxies));
+    final profiles = ref.watch(profilesProvider);
+
     return CommonScaffold(
       isLoading: isLoading,
       resizeToAvoidBottomInset: false,
@@ -288,17 +338,55 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
       actions: _buildActions(context),
       title: context.appLocalizations.proxies,
       searchState: AppBarSearchState(onSearch: _onSearch),
-      body: Column(
-        children: [
-          _buildModeSelector(context),
-          Expanded(
-            child: switch (proxiesType) {
-              ProxiesType.tab => ProxiesTabView(key: _proxiesTabKey),
-              ProxiesType.list => const ProxiesListView(),
-            },
-          ),
-        ],
-      ),
+      body: profiles.isEmpty
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const SizedBox(
+                        width: 44,
+                        height: 44,
+                        child: CircularProgressIndicator(strokeWidth: 3),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Загружаем конфигурации...',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Синхронизация серверов VPN и Обхода блокировок',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : Column(
+              children: [
+                _buildModeSelector(context),
+                Expanded(
+                  child: switch (proxiesType) {
+                    ProxiesType.tab => ProxiesTabView(key: _proxiesTabKey),
+                    ProxiesType.list => const ProxiesListView(),
+                  },
+                ),
+              ],
+            ),
     );
   }
 }

@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:crypto/crypto.dart';
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/models/models.dart';
@@ -100,7 +102,11 @@ class EaveVpnSync {
           .map((e) => e.trim())
           .where((e) => e.isNotEmpty && !e.startsWith('#'))
           .toList();
-      final clashYaml = convertProxyUrisToMihomoYaml(lines);
+      final clashYaml = convertProxyUrisToMihomoYaml(
+        lines,
+        groupName: label,
+        isUnblockMode: label == 'Обход блокировок',
+      );
       if (clashYaml.trim().isEmpty) {
         return null;
       }
@@ -143,30 +149,58 @@ class EaveVpnSync {
     }
   }
 
+  static final ValueNotifier<bool> isSyncingNotifier = ValueNotifier<bool>(false);
+  static final ValueNotifier<DateTime?> lastSyncNotifier = ValueNotifier<DateTime?>(null);
+  static Timer? _hourlyTimer;
+
+  static void startHourlySync() {
+    _hourlyTimer?.cancel();
+    _hourlyTimer = Timer.periodic(const Duration(hours: 1), (_) {
+      commonPrint.log('EaveVpnSync: running hourly auto-sync...');
+      syncConfigs(force: true);
+    });
+  }
+
+  static String getLastSyncText() {
+    final last = lastSyncNotifier.value;
+    if (last == null) return 'Обновляется раз в 1 час';
+    final diff = DateTime.now().difference(last);
+    if (diff.inMinutes < 1) return 'Обновлено только что';
+    if (diff.inMinutes < 60) return 'Обновлено ${diff.inMinutes} мин. назад';
+    return 'Обновлено ${diff.inHours} ч. назад';
+  }
+
   static Future<bool> syncConfigs({bool force = false}) async {
+    if (isSyncingNotifier.value) return false;
+    isSyncingNotifier.value = true;
     try {
       final ref = globalState.container;
       final currentId = ref.read(currentProfileIdProvider);
       final hasActive = currentId != null;
 
-      // 1. Sync VPN Profile (Whitelist)
+      // 1. Sync VPN Profile
       final vpnProfile = await _syncSingleProfile(
         label: 'VPN',
         url: vpnUrl,
         selectIfNone: !hasActive,
       );
 
-      // 2. Sync Unblock Profile (Blacklist)
+      // 2. Sync Unblock Profile
       final unblockProfile = await _syncSingleProfile(
         label: 'Обход блокировок',
         url: unblockUrl,
         selectIfNone: false,
       );
 
+      lastSyncNotifier.value = DateTime.now();
+      startHourlySync();
+
       return vpnProfile != null || unblockProfile != null;
     } catch (e) {
       commonPrint.log('EaveVpnSync overall error: $e');
       return false;
+    } finally {
+      isSyncingNotifier.value = false;
     }
   }
 }

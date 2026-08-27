@@ -195,6 +195,7 @@ class ProxiesTabViewState extends ConsumerState<ProxiesTabView>
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (groups.length > 1)
         NotificationListener<ScrollMetricsNotification>(
           onNotification: (scrollNotification) {
             _hasMoreButtonNotifier.value =

@@ -30,13 +30,7 @@ class AboutView extends StatelessWidget {
   const AboutView({super.key});
 
   Future<void> _checkUpdate(BuildContext context) async {
-    final data = await globalState.safeRun<Map<String, dynamic>?>(
-      request.checkForUpdate,
-      title: context.appLocalizations.checkUpdate,
-    );
-    globalState.container
-        .read(commonActionProvider.notifier)
-        .checkUpdateResultHandle(data: data, isUser: true);
+    globalState.openUrl('https://github.com/Kirillo4ka/EaveVPN/releases/latest');
   }
 
   List<Widget> _buildMoreSection(BuildContext context) {
@@ -47,12 +41,23 @@ class AboutView extends StatelessWidget {
       items: [
         ListItem(
           title: Text(appLocalizations.checkUpdate),
+          subtitle: const Text('Перейти к свежему релизу на GitHub'),
           onTap: () {
             _checkUpdate(context);
           },
+          trailing: const Icon(Icons.launch),
+        ),
+        ListItem(
+          title: const Text('Telegram канал'),
+          subtitle: const Text('@EaveVPN'),
+          onTap: () {
+            globalState.openUrl('https://t.me/EaveVPN');
+          },
+          trailing: const Icon(Icons.launch),
         ),
         ListItem(
           title: Text(appLocalizations.project),
+          subtitle: const Text('https://github.com/Kirillo4ka/EaveVPN'),
           onTap: () {
             globalState.openUrl('https://github.com/$repository');
           },
