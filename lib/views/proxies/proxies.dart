@@ -178,8 +178,8 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
     // PC / Desktop Version: Single unified list with clean last updated status
     if (system.isDesktop) {
       return Container(
-        margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        margin: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
           borderRadius: BorderRadius.circular(12),
@@ -188,25 +188,25 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
           ),
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.sync,
-                  size: 15,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Все серверы (Единый список)',
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-              ],
+            Icon(
+              Icons.public,
+              size: 16,
+              color: theme.colorScheme.primary,
             ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Все серверы',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
             ValueListenableBuilder<DateTime?>(
               valueListenable: EaveVpnSync.lastSyncNotifier,
               builder: (context, _, _) {
