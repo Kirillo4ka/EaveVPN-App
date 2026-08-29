@@ -160,6 +160,59 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
   }
 
   Widget _buildModeSelector(BuildContext context) {
+    final theme = Theme.of(context);
+
+    // PC / Desktop Version: Single unified list with clean last updated status
+    if (system.isDesktop) {
+      return Container(
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.sync,
+                  size: 15,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Все серверы (Единый список)',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            ValueListenableBuilder<DateTime?>(
+              valueListenable: EaveVpnSync.lastSyncNotifier,
+              builder: (context, _, _) {
+                return Text(
+                  '⚡ ${EaveVpnSync.getLastSyncText()}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.primary,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Android / Mobile Version: Clean 2-way switcher (VPN vs Обход блокировок) without subtitles
     final profiles = ref.watch(profilesProvider);
     final currentProfileId = ref.watch(currentProfileIdProvider);
 
@@ -181,11 +234,8 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 6),
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest
-            .withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(16),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -197,7 +247,6 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
                   child: _buildModeTab(
                     context: context,
                     label: 'VPN',
-                    subtitle: 'Все сайты',
                     icon: Icons.vpn_lock,
                     isSelected: selectedId == vpnProfile.id,
                     onTap: () {
@@ -212,13 +261,12 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
                   ),
                 ),
               if (vpnProfile != null && unblockProfile != null)
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
               if (unblockProfile != null)
                 Expanded(
                   child: _buildModeTab(
                     context: context,
                     label: 'Обход блокировок',
-                    subtitle: 'Умный режим',
                     icon: Icons.shield_outlined,
                     isSelected: selectedId == unblockProfile.id,
                     onTap: () {
@@ -240,10 +288,10 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
               valueListenable: EaveVpnSync.lastSyncNotifier,
               builder: (context, _, _) {
                 return Text(
-                  '⚡ ${EaveVpnSync.getLastSyncText()} (автообновление каждый час)',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  '⚡ ${EaveVpnSync.getLastSyncText()}',
+                  style: theme.textTheme.bodySmall?.copyWith(
                     fontSize: 10.5,
-                    color: Theme.of(context).colorScheme.outline,
+                    color: theme.colorScheme.outline,
                   ),
                 );
               },
@@ -257,7 +305,6 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
   Widget _buildModeTab({
     required BuildContext context,
     required String label,
-    required String subtitle,
     required IconData icon,
     required bool isSelected,
     required VoidCallback onTap,
@@ -265,20 +312,20 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
     final theme = Theme.of(context);
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(10),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
         decoration: BoxDecoration(
           color: isSelected
               ? theme.colorScheme.primaryContainer
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           boxShadow: isSelected
               ? [
                   BoxShadow(
                     color: theme.colorScheme.primary.withValues(alpha: 0.15),
-                    blurRadius: 8,
+                    blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
                 ]
@@ -289,40 +336,22 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
           children: [
             Icon(
               icon,
-              size: 20,
+              size: 18,
               color: isSelected
                   ? theme.colorScheme.primary
                   : theme.colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight:
-                          isSelected ? FontWeight.bold : FontWeight.w500,
-                      color: isSelected
-                          ? theme.colorScheme.onPrimaryContainer
-                          : theme.colorScheme.onSurfaceVariant,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontSize: 10,
-                      color: isSelected
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.outline,
-                    ),
-                  ),
-                ],
+            const SizedBox(width: 7),
+            Text(
+              label,
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected
+                    ? theme.colorScheme.onPrimaryContainer
+                    : theme.colorScheme.onSurfaceVariant,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

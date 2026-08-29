@@ -189,19 +189,24 @@ class EaveVpnSync {
       final currentId = ref.read(currentProfileIdProvider);
       final hasActive = currentId != null;
 
-      // 1. Sync VPN Profile
+      final isDesktop = system.isDesktop;
+
+      // 1. Sync VPN Profile (All configs in one unified profile on Desktop)
       final vpnProfile = await _syncSingleProfile(
         label: 'VPN',
         url: vpnUrl,
         selectIfNone: !hasActive,
       );
 
-      // 2. Sync Unblock Profile
-      final unblockProfile = await _syncSingleProfile(
-        label: 'Обход блокировок',
-        url: unblockUrl,
-        selectIfNone: false,
-      );
+      // 2. Sync Unblock Profile (Only on mobile / Android)
+      Profile? unblockProfile;
+      if (!isDesktop) {
+        unblockProfile = await _syncSingleProfile(
+          label: 'Обход блокировок',
+          url: unblockUrl,
+          selectIfNone: false,
+        );
+      }
 
       lastSyncNotifier.value = DateTime.now();
       startHourlySync();
