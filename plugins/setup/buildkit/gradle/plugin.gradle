@@ -13,7 +13,10 @@ def launcher = "${buildkitDir}/run_build_tool.${isWindows ? 'cmd' : 'sh'}"
 def androidArch = System.getenv('ANDROID_ARCH')
 def targetPlatform = project.findProperty('target-platform') ?:
         rootProject.findProperty('target-platform')
-def androidNdk = System.getenv('ANDROID_NDK')
+def androidNdk = System.getenv('ANDROID_NDK') ?:
+        System.getenv('ANDROID_NDK_HOME') ?:
+        System.getenv('ANDROID_NDK_ROOT') ?:
+        "D:/DevTools/AndroidSDK/ndk/28.2.13676358" 
 def archArgs = androidArch
         ? ['--arch', androidArch]
         : (targetPlatform ? ['--target-platform', targetPlatform.toString()] : [])
@@ -29,6 +32,12 @@ task buildGoCore(type: Exec) {
     environment 'ANDROID_NDK', androidNdk
     environment 'APP_ENV', project.hasProperty('appEnv') ? project.appEnv : 'pre'
     environment 'PROJECT_DIR', projectRoot
+    environment 'TEMP', 'D:/DevTools/Temp'
+    environment 'TMP', 'D:/DevTools/Temp'
+    environment 'GOTMPDIR', 'D:/DevTools/Temp/gotmp'
+    environment 'GOCACHE', 'D:/DevTools/Temp/gocache'
+    environment 'GOPROXY', 'https://goproxy.io,https://goproxy.cn,direct'
+    environment 'GOSUMDB', 'off'
 }
 
 def goCoreTask = buildGoCore
