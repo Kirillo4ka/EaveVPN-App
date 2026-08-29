@@ -33,6 +33,8 @@ String convertProxyUrisToMihomoYaml(
   List<String> uris, {
   String groupName = 'VPN',
   bool isUnblockMode = false,
+  bool filter4gOnly = false,
+  bool filterCountryOnly = false,
 }) {
   final proxies = <String>[];
   final names = <String>[];
@@ -47,6 +49,20 @@ String convertProxyUrisToMihomoYaml(
     if (yaml.isNotEmpty) {
       var name = _extractName(yaml);
       if (name.isEmpty) name = defaultName;
+
+      final is4g = name.contains('4G') ||
+          name.contains('LTE') ||
+          name.contains('4g') ||
+          name.contains('lte') ||
+          name.contains('📶');
+
+      if (filter4gOnly && !is4g) {
+        continue;
+      }
+      if (filterCountryOnly && is4g) {
+        continue;
+      }
+
       if (seenNames.containsKey(name)) {
         seenNames[name] = seenNames[name]! + 1;
         final uniqueName = '$name (${seenNames[name]})';

@@ -78,6 +78,8 @@ class EaveVpnSync {
     required String label,
     required String url,
     bool selectIfNone = false,
+    bool filter4gOnly = false,
+    bool filterCountryOnly = false,
   }) async {
     try {
       final response = await http.get(
@@ -117,6 +119,8 @@ class EaveVpnSync {
         lines,
         groupName: label,
         isUnblockMode: label == 'Обход блокировок',
+        filter4gOnly: filter4gOnly,
+        filterCountryOnly: filterCountryOnly,
       );
       if (clashYaml.trim().isEmpty) {
         return null;
@@ -203,20 +207,22 @@ class EaveVpnSync {
 
       final isDesktop = system.isDesktop;
 
-      // 1. Sync VPN Profile (All configs in one unified profile on Desktop)
+      // 1. Sync VPN Profile (All configs on Desktop; only countries on Android)
       final vpnProfile = await _syncSingleProfile(
         label: 'VPN',
         url: vpnUrl,
         selectIfNone: !hasActive,
+        filterCountryOnly: !isDesktop,
       );
 
-      // 2. Sync Unblock Profile (Only on mobile / Android)
+      // 2. Sync Unblock Profile (Only on mobile / Android; only 4G/LTE servers)
       Profile? unblockProfile;
       if (!isDesktop) {
         unblockProfile = await _syncSingleProfile(
           label: 'Обход блокировок',
           url: unblockUrl,
           selectIfNone: false,
+          filter4gOnly: true,
         );
       }
 
