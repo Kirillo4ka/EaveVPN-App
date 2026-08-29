@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 class TgMtprotoBridge {
   static ServerSocket? _server;
   static bool _isRunning = false;
-  static int _port = 9090;
+  static int _port = 1443;
   static String _workerUrl = 'wss://eave-tg.fastedge.workers.dev';
   static final ValueNotifier<bool> isRunningNotifier = ValueNotifier<bool>(false);
   static final ValueNotifier<int> activeConnectionsNotifier = ValueNotifier<int>(0);
