@@ -16,20 +16,11 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
   final int _proxyPort = 9090;
   final String _secret =
       'ee000000000000000000000000000000007777772e676f6f676c652e636f6d';
-  late TextEditingController _workerController;
-
   @override
   void initState() {
     super.initState();
-    _workerController = TextEditingController(text: TgMtprotoBridge.workerUrl);
     // Auto-start MTProto bridge
     TgMtprotoBridge.start(port: _proxyPort);
-  }
-
-  @override
-  void dispose() {
-    _workerController.dispose();
-    super.dispose();
   }
 
   String get _mtprotoLink =>
@@ -328,67 +319,9 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
                 },
               ),
 
-              const SizedBox(height: 16),
-
-              // 3. Worker URL Configuration Card
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest
-                      .withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: theme.colorScheme.outlineVariant
-                        .withValues(alpha: 0.4),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.cloud_queue_rounded,
-                      size: 20,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextField(
-                        controller: _workerController,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontFamily: 'monospace',
-                        ),
-                        decoration: const InputDecoration(
-                          isDense: true,
-                          border: InputBorder.none,
-                          labelText: 'Cloudflare Worker URL / Шлюз',
-                          hintText: 'https://eave-tg.fastedge.workers.dev',
-                        ),
-                        onChanged: (val) {
-                          TgMtprotoBridge.setWorkerUrl(val);
-                        },
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.check, size: 20),
-                      onPressed: () {
-                        TgMtprotoBridge.setWorkerUrl(_workerController.text);
-                        TgMtprotoBridge.start(port: _proxyPort);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Шлюз обновлен и перезапущен!'),
-                            duration: Duration(seconds: 2),
-                          ),
-                        );
-                      },
-                      tooltip: 'Применить адрес',
-                    ),
-                  ],
-                ),
-              ),
-
               const SizedBox(height: 20),
 
-              // 4. Main Action Button: Connect to Telegram
+              // 3. Main Action Button: Connect to Telegram
               SizedBox(
                 height: 52,
                 child: FilledButton.icon(
