@@ -164,6 +164,13 @@ class EaveVpnSync {
   static final ValueNotifier<DateTime?> lastSyncNotifier = ValueNotifier<DateTime?>(null);
   static Timer? _hourlyTimer;
 
+  static Future<void> initLastSync() async {
+    final saved = await Preferences().getLastSyncTime();
+    if (saved != null && lastSyncNotifier.value == null) {
+      lastSyncNotifier.value = saved;
+    }
+  }
+
   static void startHourlySync() {
     _hourlyTimer?.cancel();
     _hourlyTimer = Timer.periodic(const Duration(hours: 1), (_) {
@@ -208,7 +215,9 @@ class EaveVpnSync {
         );
       }
 
-      lastSyncNotifier.value = DateTime.now();
+      final now = DateTime.now();
+      lastSyncNotifier.value = now;
+      Preferences().setLastSyncTime(now);
       startHourlySync();
 
       return vpnProfile != null || unblockProfile != null;

@@ -99,6 +99,24 @@ class Preferences {
     final sharedPreferencesIns = await sharedPreferencesCompleter.future;
     await sharedPreferencesIns?.clear();
   }
+
+  Future<DateTime?> getLastSyncTime() async {
+    try {
+      final prefs = await sharedPreferencesCompleter.future;
+      final str = prefs?.getString('eavevpn_last_sync_iso');
+      if (str == null) return null;
+      return DateTime.tryParse(str);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> setLastSyncTime(DateTime time) async {
+    try {
+      final prefs = await sharedPreferencesCompleter.future;
+      await prefs?.setString('eavevpn_last_sync_iso', time.toIso8601String());
+    } catch (_) {}
+  }
 }
 
 final preferences = Preferences();
