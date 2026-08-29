@@ -217,10 +217,14 @@ class AppSidebarContainer extends ConsumerWidget {
                                     ),
                                 destinations: navigationItems
                                     .map(
-                                      (e) => NavigationRailDestination(
-                                        icon: e.icon,
-                                        label: Text(Intl.message(e.label.name)),
-                                      ),
+                                        (e) => NavigationRailDestination(
+                                          icon: e.icon,
+                                          label: Text(
+                                            e.label == PageLabel.tg_proxy
+                                                ? 'TG Прокси'
+                                                : Intl.message(e.label.name),
+                                          ),
+                                        ),
                                     )
                                     .toList(),
                                 onDestinationSelected: (index) {

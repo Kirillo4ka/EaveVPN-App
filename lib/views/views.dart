@@ -13,3 +13,4 @@ export 'proxies/proxies.dart';
 export 'resources.dart';
 export 'tools.dart';
 export 'ping_setting.dart';
+export 'tg_proxy/tg_proxy.dart';
