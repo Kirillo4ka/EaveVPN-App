@@ -33,7 +33,7 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
   }
 
   String get _mtprotoLink =>
-      'tg://proxy?server=\$_proxyHost&port=\$_proxyPort&secret=\$_secret';
+      'tg://proxy?server=$_proxyHost&port=$_proxyPort&secret=$_secret';
 
   Future<void> _connectToTelegram(BuildContext context) async {
     if (!TgMtprotoBridge.isRunning) {
@@ -42,7 +42,7 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
 
     final tgUri = Uri.parse(_mtprotoLink);
     final webFallback = Uri.parse(
-      'https://t.me/proxy?server=\$_proxyHost&port=\$_proxyPort&secret=\$_secret',
+      'https://t.me/proxy?server=$_proxyHost&port=$_proxyPort&secret=$_secret',
     );
 
     try {
@@ -65,7 +65,7 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка запуска Telegram: \$e'),
+            content: Text('Ошибка запуска Telegram: $e'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -87,12 +87,12 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
     Clipboard.setData(
       ClipboardData(
         text:
-            'Тип: MTProto\nСервер: \$_proxyHost\nПорт: \$_proxyPort\nСекрет: \$_secret',
+            'Тип: MTProto\nСервер: $_proxyHost\nПорт: $_proxyPort\nСекрет: $_secret',
       ),
     );
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Параметры MTProto скопированы (\$_proxyHost:\$_proxyPort)'),
+        content: Text('Параметры MTProto скопированы ($_proxyHost:$_proxyPort)'),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -264,7 +264,7 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
-                                      '\$_proxyHost:\$_proxyPort',
+                                      '$_proxyHost:$_proxyPort',
                                       style: theme.textTheme.labelMedium
                                           ?.copyWith(
                                         fontFamily: 'monospace',

@@ -39,15 +39,15 @@ class TgMtprotoBridge {
       _server = await ServerSocket.bind(InternetAddress.loopbackIPv4, _port);
       _isRunning = true;
       isRunningNotifier.value = true;
-      debugPrint('[TgMtprotoBridge] Started on 127.0.0.1:\$_port -> \$_workerUrl');
+      debugPrint('[TgMtprotoBridge] Started on 127.0.0.1:$_port -> $_workerUrl');
 
       _server!.listen(_handleIncomingClient, onError: (err) {
-        debugPrint('[TgMtprotoBridge] Server error: \$err');
+        debugPrint('[TgMtprotoBridge] Server error: $err');
       });
 
       return true;
     } catch (e) {
-      debugPrint('[TgMtprotoBridge] Failed to start on port \$_port: \$e');
+      debugPrint('[TgMtprotoBridge] Failed to start on port $_port: $e');
       _isRunning = false;
       isRunningNotifier.value = false;
       return false;
