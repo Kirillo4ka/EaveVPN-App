@@ -65,35 +65,53 @@ class TgMtprotoBridge {
     } catch (_) {}
   }
 
-  static void _handleIncomingClient(Socket clientSocket) async {
+  static void _handleIncomingClient(Socket clientSocket) {
     activeConnectionsNotifier.value++;
     WebSocket? ws;
+    final earlyBuffer = <Uint8List>[];
+    var wsConnected = false;
 
-    try {
-      ws = await WebSocket.connect(
-        _workerUrl,
-        headers: {
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-      ).timeout(const Duration(seconds: 10));
-
-      // Client TCP -> WebSocket
-      clientSocket.listen(
-        (data) {
+    clientSocket.listen(
+      (data) {
+        if (wsConnected && ws != null) {
           try {
-            ws?.add(data);
+            ws!.add(data);
           } catch (_) {
             _cleanup(clientSocket, ws);
           }
-        },
-        onError: (_) => _cleanup(clientSocket, ws),
-        onDone: () => _cleanup(clientSocket, ws),
-        cancelOnError: true,
-      );
+        } else {
+          earlyBuffer.add(data);
+        }
+      },
+      onError: (err) {
+        debugPrint('[TgMtprotoBridge] Client socket error: $err');
+        _cleanup(clientSocket, ws);
+      },
+      onDone: () {
+        _cleanup(clientSocket, ws);
+      },
+      cancelOnError: true,
+    );
 
-      // WebSocket -> Client TCP
-      ws.listen(
+    WebSocket.connect(
+      _workerUrl,
+      headers: {
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    ).timeout(const Duration(seconds: 10)).then((connectedWs) {
+      ws = connectedWs;
+      wsConnected = true;
+
+      // Flush early buffered packets to WebSocket
+      for (final packet in earlyBuffer) {
+        try {
+          ws!.add(packet);
+        } catch (_) {}
+      }
+      earlyBuffer.clear();
+
+      ws!.listen(
         (message) {
           try {
             if (message is List<int>) {
@@ -107,14 +125,19 @@ class TgMtprotoBridge {
             _cleanup(clientSocket, ws);
           }
         },
-        onError: (_) => _cleanup(clientSocket, ws),
-        onDone: () => _cleanup(clientSocket, ws),
+        onError: (err) {
+          debugPrint('[TgMtprotoBridge] WS stream error: $err');
+          _cleanup(clientSocket, ws);
+        },
+        onDone: () {
+          _cleanup(clientSocket, ws);
+        },
         cancelOnError: true,
       );
-    } catch (e) {
-      debugPrint('[TgMtprotoBridge] Connection error: \$e');
+    }).catchError((e) {
+      debugPrint('[TgMtprotoBridge] WS connect error: $e');
       _cleanup(clientSocket, ws);
-    }
+    });
   }
 
   static void _cleanup(Socket clientSocket, WebSocket? ws) {
