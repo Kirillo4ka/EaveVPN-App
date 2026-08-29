@@ -56,18 +56,9 @@ class AboutView extends StatelessWidget {
           trailing: const Icon(Icons.launch),
         ),
         ListItem(
-          title: const Text('Официальный сайт'),
-          subtitle: const Text('https://eavevpn.fastedge.workers.dev'),
+          title: const Text('Сайт'),
           onTap: () {
             globalState.openUrl('https://eavevpn.fastedge.workers.dev');
-          },
-          trailing: const Icon(Icons.launch),
-        ),
-        ListItem(
-          title: const Text('GitHub Профиль'),
-          subtitle: const Text('https://github.com/Kirillo4ka'),
-          onTap: () {
-            globalState.openUrl('https://github.com/Kirillo4ka');
           },
           trailing: const Icon(Icons.launch),
         ),
