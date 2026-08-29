@@ -14,7 +14,7 @@ class TgProxyView extends ConsumerStatefulWidget {
 class _TgProxyViewState extends ConsumerState<TgProxyView> {
   final String _proxyHost = '127.0.0.1';
   final int _proxyPort = 9090;
-  final String _secret = 'dd00000000000000000000000000000000';
+  final String _secret = '00000000000000000000000000000000';
   @override
   void initState() {
     super.initState();
