@@ -181,11 +181,16 @@ class EaveVpnSync {
 
   static String getLastSyncText() {
     final last = lastSyncNotifier.value;
-    if (last == null) return 'Обновляется раз в 1 час';
-    final diff = DateTime.now().difference(last);
-    if (diff.inMinutes < 1) return 'Обновлено только что';
-    if (diff.inMinutes < 60) return 'Обновлено ${diff.inMinutes} мин. назад';
-    return 'Обновлено ${diff.inHours} ч. назад';
+    if (last == null) return 'Обновление раз в 1 час';
+    final h = last.hour.toString().padLeft(2, '0');
+    final m = last.minute.toString().padLeft(2, '0');
+    final now = DateTime.now();
+    if (now.year == last.year && now.month == last.month && now.day == last.day) {
+      return 'Обновлено в $h:$m';
+    }
+    final d = last.day.toString().padLeft(2, '0');
+    final mo = last.month.toString().padLeft(2, '0');
+    return 'Обновлено $d.$mo в $h:$m';
   }
 
   static Future<bool> syncConfigs({bool force = false}) async {

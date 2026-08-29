@@ -60,10 +60,11 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
       ),
       if (_isTab)
         IconButton(
+          tooltip: 'Наверх к выбранной группе',
           onPressed: () {
             _proxiesTabKey.currentState?.scrollToGroupSelected();
           },
-          icon: const Icon(Icons.adjust, weight: 1),
+          icon: const Icon(Icons.arrow_upward),
         ),
       CommonPopupBox(
         targetBuilder: (open) {
