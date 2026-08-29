@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/providers/providers.dart';
-import 'package:fl_clash/widgets/widgets.dart';
+import 'package:fl_clash/services/tg_mtproto_bridge.dart';
 
 class TgProxyView extends ConsumerStatefulWidget {
   const TgProxyView({super.key});
@@ -15,12 +13,37 @@ class TgProxyView extends ConsumerStatefulWidget {
 
 class _TgProxyViewState extends ConsumerState<TgProxyView> {
   final String _proxyHost = '127.0.0.1';
-  final int _proxyPort = 7890;
+  final int _proxyPort = 9090;
+  final String _secret =
+      'ee000000000000000000000000000000007777772e676f6f676c652e636f6d';
+  late TextEditingController _workerController;
+
+  @override
+  void initState() {
+    super.initState();
+    _workerController = TextEditingController(text: TgMtprotoBridge.workerUrl);
+    // Auto-start MTProto bridge
+    TgMtprotoBridge.start(port: _proxyPort);
+  }
+
+  @override
+  void dispose() {
+    _workerController.dispose();
+    super.dispose();
+  }
+
+  String get _mtprotoLink =>
+      'tg://proxy?server=\$_proxyHost&port=\$_proxyPort&secret=\$_secret';
 
   Future<void> _connectToTelegram(BuildContext context) async {
-    final tgUri = Uri.parse('tg://socks?server=$_proxyHost&port=$_proxyPort');
-    final webFallback =
-        Uri.parse('https://t.me/socks?server=$_proxyHost&port=$_proxyPort');
+    if (!TgMtprotoBridge.isRunning) {
+      await TgMtprotoBridge.start(port: _proxyPort);
+    }
+
+    final tgUri = Uri.parse(_mtprotoLink);
+    final webFallback = Uri.parse(
+      'https://t.me/proxy?server=\$_proxyHost&port=\$_proxyPort&secret=\$_secret',
+    );
 
     try {
       if (await canLaunchUrl(tgUri)) {
@@ -33,7 +56,7 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Открываю Telegram для подключения прокси...'),
+            content: Text('Открываю Telegram для подключения MTProto Proxy...'),
             duration: Duration(seconds: 3),
           ),
         );
@@ -42,7 +65,7 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка запуска Telegram: $e'),
+            content: Text('Ошибка запуска Telegram: \$e'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -51,12 +74,10 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
   }
 
   void _copyTgLink(BuildContext context) {
-    Clipboard.setData(
-      ClipboardData(text: 'tg://socks?server=$_proxyHost&port=$_proxyPort'),
-    );
+    Clipboard.setData(ClipboardData(text: _mtprotoLink));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Ссылка скопирована: tg://socks?server=127.0.0.1&port=7890'),
+        content: Text('Ссылка скопирована в буфер обмена!'),
         duration: Duration(seconds: 2),
       ),
     );
@@ -65,13 +86,14 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
   void _copyParams(BuildContext context) {
     Clipboard.setData(
       ClipboardData(
-        text: 'Тип: SOCKS5\nСервер: $_proxyHost\nПорт: $_proxyPort',
+        text:
+            'Тип: MTProto\nСервер: \$_proxyHost\nПорт: \$_proxyPort\nСекрет: \$_secret',
       ),
     );
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Параметры прокси скопированы в буфер обмена'),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: Text('Параметры MTProto скопированы (\$_proxyHost:\$_proxyPort)'),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -79,7 +101,6 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isStart = ref.watch(isStartProvider);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -120,7 +141,7 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
                         ),
                       ),
                       child: const Icon(
-                        Icons.send_rounded,
+                        Icons.shield_rounded,
                         color: Colors.white,
                         size: 28,
                       ),
@@ -133,7 +154,7 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
                           Row(
                             children: [
                               Text(
-                                'Telegram WS-Прокси',
+                                'Telegram MTProto WS-Прокси',
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 18,
@@ -146,11 +167,12 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
                                   vertical: 2,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF2AABEE).withValues(alpha: 0.2),
+                                  color: const Color(0xFF2AABEE)
+                                      .withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: const Text(
-                                  'WSS Direct',
+                                  'MTProto',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
@@ -162,7 +184,7 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Защищенный WebSocket туннель для обхода блокировок и звонков в Telegram',
+                            'Нативный защищенный MTProto туннель для обхода любых блокировок в Telegram',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -177,102 +199,196 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
               const SizedBox(height: 20),
 
               // 2. Status Card
-              Card(
-                elevation: 0,
-                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(
-                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              ValueListenableBuilder<bool>(
+                valueListenable: TgMtprotoBridge.isRunningNotifier,
+                builder: (context, isRunning, _) {
+                  return Card(
+                    elevation: 0,
+                    color: theme.colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: theme.colorScheme.outlineVariant
+                            .withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
                         children: [
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Container(
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: isStart
-                                      ? Colors.greenAccent.shade400
-                                      : Colors.amberAccent.shade400,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: (isStart ? Colors.green : Colors.amber)
-                                          .withValues(alpha: 0.5),
-                                      blurRadius: 6,
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isRunning
+                                          ? Colors.greenAccent.shade400
+                                          : Colors.amberAccent.shade400,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: (isRunning
+                                                  ? Colors.green
+                                                  : Colors.amber)
+                                              .withValues(alpha: 0.5),
+                                          blurRadius: 6,
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    isRunning
+                                        ? 'MTProto мост активен'
+                                        : 'Мост остановлен',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 10),
-                              Text(
-                                isStart
-                                    ? 'Прокси активен и готов к работе'
-                                    : 'Сервис в режиме ожидания',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.surface,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      '\$_proxyHost:\$_proxyPort',
+                                      style: theme.textTheme.labelMedium
+                                          ?.copyWith(
+                                        fontFamily: 'monospace',
+                                        fontWeight: FontWeight.bold,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: Icon(
+                                      isRunning
+                                          ? Icons.stop_circle_outlined
+                                          : Icons.play_circle_fill_outlined,
+                                      color: isRunning
+                                          ? Colors.redAccent
+                                          : Colors.greenAccent,
+                                      size: 24,
+                                    ),
+                                    onPressed: () {
+                                      if (isRunning) {
+                                        TgMtprotoBridge.stop();
+                                      } else {
+                                        TgMtprotoBridge.start(port: _proxyPort);
+                                      }
+                                    },
+                                    tooltip: isRunning
+                                        ? 'Остановить мост'
+                                        : 'Запустить мост',
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surface,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '$_proxyHost:$_proxyPort',
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                fontFamily: 'monospace',
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.primary,
+                          const Divider(height: 24),
+                          Row(
+                            children: [
+                              _buildDetailChip(
+                                context: context,
+                                label: 'Тип прокси',
+                                value: 'MTProto Fake-TLS',
                               ),
-                            ),
+                              const SizedBox(width: 12),
+                              _buildDetailChip(
+                                context: context,
+                                label: 'Транспорт',
+                                value: 'TLS / WebSocket',
+                              ),
+                              const SizedBox(width: 12),
+                              _buildDetailChip(
+                                context: context,
+                                label: 'Звонки / Медиа',
+                                value: 'Поддерживаются',
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                      const Divider(height: 24),
-                      Row(
-                        children: [
-                          _buildDetailChip(
-                            context: context,
-                            label: 'Протокол',
-                            value: 'SOCKS5 / HTTP',
-                          ),
-                          const SizedBox(width: 12),
-                          _buildDetailChip(
-                            context: context,
-                            label: 'Маскировка',
-                            value: 'TLS / WebSocket',
-                          ),
-                          const SizedBox(width: 12),
-                          _buildDetailChip(
-                            context: context,
-                            label: 'Звонки',
-                            value: 'UDP / Поддерживается',
-                          ),
-                        ],
-                      ),
-                    ],
+                    ),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              // 3. Worker URL Configuration Card
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest
+                      .withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: theme.colorScheme.outlineVariant
+                        .withValues(alpha: 0.4),
                   ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.cloud_queue_rounded,
+                      size: 20,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _workerController,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontFamily: 'monospace',
+                        ),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          border: InputBorder.none,
+                          labelText: 'Cloudflare Worker URL / Шлюз',
+                          hintText: 'https://eave-tg.fastedge.workers.dev',
+                        ),
+                        onChanged: (val) {
+                          TgMtprotoBridge.setWorkerUrl(val);
+                        },
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.check, size: 20),
+                      onPressed: () {
+                        TgMtprotoBridge.setWorkerUrl(_workerController.text);
+                        TgMtprotoBridge.start(port: _proxyPort);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Шлюз обновлен и перезапущен!'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      tooltip: 'Применить адрес',
+                    ),
+                  ],
                 ),
               ),
 
               const SizedBox(height: 20),
 
-              // 3. Main Action Button: Connect to Telegram
+              // 4. Main Action Button: Connect to Telegram
               SizedBox(
                 height: 52,
                 child: FilledButton.icon(
@@ -287,7 +403,7 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
                   ),
                   icon: const Icon(Icons.telegram, size: 24),
                   label: const Text(
-                    'Подключить в Telegram (1 клик)',
+                    'Подключить MTProto в Telegram (1 клик)',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -298,7 +414,7 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
 
               const SizedBox(height: 12),
 
-              // 4. Secondary Action Buttons
+              // 5. Secondary Action Buttons
               Row(
                 children: [
                   Expanded(
@@ -311,7 +427,7 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
                         padding: const EdgeInsets.symmetric(vertical: 13),
                       ),
                       icon: const Icon(Icons.link, size: 18),
-                      label: const Text('Скопировать ссылку'),
+                      label: const Text('Скопировать MTProto ссылку'),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -333,14 +449,16 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
 
               const SizedBox(height: 24),
 
-              // 5. Instruction Card
+              // 6. Instruction Card
               Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                  color: theme.colorScheme.surfaceContainerHighest
+                      .withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+                    color: theme.colorScheme.outlineVariant
+                        .withValues(alpha: 0.4),
                   ),
                 ),
                 child: Column(
@@ -355,7 +473,7 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Как это работает?',
+                          'Как работает нативный MTProto Proxy?',
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -367,21 +485,21 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
                       context: context,
                       number: '1',
                       text:
-                          'Нажмите «Подключить в Telegram». Откроется ваш клиент Telegram (официальный, Desktop, exteraGram, AyuGram и др.).',
+                          'Нажмите «Подключить MTProto в Telegram». Откроется ваш клиент Telegram.',
                     ),
                     const SizedBox(height: 8),
                     _buildStepRow(
                       context: context,
                       number: '2',
                       text:
-                          'В диалоговом окне Telegram нажмите «Включить этот прокси-сервер». В шапке Telegram появится иконка щита.',
+                          'В диалоговом окне Telegram нажмите «Включить прокси-сервер». В шапке Telegram появится щит 🛡️.',
                     ),
                     const SizedBox(height: 8),
                     _buildStepRow(
                       context: context,
                       number: '3',
                       text:
-                          'Все аудио/видео-звонки, фото, видео и каналы будут работать без ограничений и блокировок в РФ.',
+                          'MTProto туннелируется через защищенный WebSocket, обходя блокировки и ограничения звонков.',
                     ),
                   ],
                 ),
