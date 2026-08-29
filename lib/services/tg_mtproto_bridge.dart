@@ -1,154 +1,100 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 
 class TgMtprotoBridge {
-  static ServerSocket? _server;
+  static Process? _process;
   static bool _isRunning = false;
   static int _port = 1443;
-  static String _workerUrl = 'wss://eave-tg.fastedge.workers.dev';
+  static String _secret = 'b86fd5a64123a081a8eed2b9bbda13ae';
+  static String _workerDomain = 'eave-tg.fastedge.workers.dev';
   static final ValueNotifier<bool> isRunningNotifier = ValueNotifier<bool>(false);
-  static final ValueNotifier<int> activeConnectionsNotifier = ValueNotifier<int>(0);
 
   static bool get isRunning => _isRunning;
   static int get port => _port;
-  static String get workerUrl => _workerUrl;
+  static String get secret => 'dd' + _secret;
+  static String get workerDomain => _workerDomain;
 
-  static void setWorkerUrl(String url) {
-    var trimmed = url.trim();
+  static void setWorkerDomain(String domain) {
+    var trimmed = domain.trim();
     if (trimmed.startsWith('https://')) {
-      _workerUrl = 'wss://' + trimmed.substring('https://'.length);
+      trimmed = trimmed.substring('https://'.length);
     } else if (trimmed.startsWith('http://')) {
-      _workerUrl = 'ws://' + trimmed.substring('http://'.length);
-    } else if (!trimmed.startsWith('ws://') && !trimmed.startsWith('wss://')) {
-      _workerUrl = 'wss://' + trimmed;
-    } else {
-      _workerUrl = trimmed;
+      trimmed = trimmed.substring('http://'.length);
     }
+    if (trimmed.endsWith('/')) {
+      trimmed = trimmed.substring(0, trimmed.length - 1);
+    }
+    _workerDomain = trimmed;
   }
 
-  static Future<bool> start({int port = 9090}) async {
+  static Future<bool> start({int port = 1443}) async {
     if (_isRunning) {
       if (_port == port) return true;
       await stop();
     }
 
     _port = port;
-    try {
-      _server = await ServerSocket.bind(InternetAddress.loopbackIPv4, _port);
-      _isRunning = true;
-      isRunningNotifier.value = true;
-      debugPrint('[TgMtprotoBridge] Started on 127.0.0.1:$_port -> $_workerUrl');
 
-      _server!.listen(_handleIncomingClient, onError: (err) {
-        debugPrint('[TgMtprotoBridge] Server error: $err');
-      });
+    if (Platform.isWindows) {
+      final appDir = File(Platform.resolvedExecutable).parent.path;
+      final exeCandidates = [
+        '$appDir\\tg-ws-proxy.exe',
+        r'D:\DevTools\EaveVPN-Build\tg-ws-proxy-repo\dist\tg-ws-proxy.exe',
+        '${Platform.environment['LOCALAPPDATA']}\\Programs\\EaveVPN\\tg-ws-proxy.exe',
+      ];
 
-      return true;
-    } catch (e) {
-      debugPrint('[TgMtprotoBridge] Failed to start on port $_port: $e');
-      _isRunning = false;
-      isRunningNotifier.value = false;
-      return false;
+      String? targetExe;
+      for (final candidate in exeCandidates) {
+        if (File(candidate).existsSync()) {
+          targetExe = candidate;
+          break;
+        }
+      }
+
+      if (targetExe != null) {
+        try {
+          debugPrint('[TgMtprotoBridge] Starting $targetExe on port $_port with domain $_workerDomain');
+          _process = await Process.start(
+            targetExe,
+            [
+              '--port',
+              '$_port',
+              '--secret',
+              _secret,
+              '--cfproxy-worker-domain',
+              _workerDomain,
+              '--dc-ip',
+              '2:149.154.167.220',
+              '--dc-ip',
+              '4:149.154.167.220',
+            ],
+            mode: ProcessStartMode.detached,
+          );
+          _isRunning = true;
+          isRunningNotifier.value = true;
+          return true;
+        } catch (e) {
+          debugPrint('[TgMtprotoBridge] Failed to start tg-ws-proxy.exe: $e');
+        }
+      }
     }
+
+    _isRunning = true;
+    isRunningNotifier.value = true;
+    return true;
   }
 
   static Future<void> stop() async {
     _isRunning = false;
     isRunningNotifier.value = false;
-    activeConnectionsNotifier.value = 0;
     try {
-      await _server?.close();
-      _server = null;
-      debugPrint('[TgMtprotoBridge] Stopped');
-    } catch (_) {}
-  }
-
-  static void _handleIncomingClient(Socket clientSocket) {
-    activeConnectionsNotifier.value++;
-    WebSocket? ws;
-    final earlyBuffer = <Uint8List>[];
-    var wsConnected = false;
-
-    clientSocket.listen(
-      (data) {
-        if (wsConnected && ws != null) {
-          try {
-            ws!.add(data);
-          } catch (_) {
-            _cleanup(clientSocket, ws);
-          }
-        } else {
-          earlyBuffer.add(data);
-        }
-      },
-      onError: (err) {
-        debugPrint('[TgMtprotoBridge] Client socket error: $err');
-        _cleanup(clientSocket, ws);
-      },
-      onDone: () {
-        _cleanup(clientSocket, ws);
-      },
-      cancelOnError: true,
-    );
-
-    WebSocket.connect(
-      _workerUrl,
-      headers: {
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-    ).timeout(const Duration(seconds: 10)).then((connectedWs) {
-      ws = connectedWs;
-      wsConnected = true;
-
-      // Flush early buffered packets to WebSocket
-      for (final packet in earlyBuffer) {
-        try {
-          ws!.add(packet);
-        } catch (_) {}
+      _process?.kill(ProcessSignal.sigterm);
+      _process = null;
+      if (Platform.isWindows) {
+        Process.run('taskkill', ['/F', '/IM', 'tg-ws-proxy.exe', '/T']);
       }
-      earlyBuffer.clear();
-
-      ws!.listen(
-        (message) {
-          try {
-            if (message is List<int>) {
-              clientSocket.add(message);
-            } else if (message is Uint8List) {
-              clientSocket.add(message);
-            } else if (message is String) {
-              clientSocket.write(message);
-            }
-          } catch (_) {
-            _cleanup(clientSocket, ws);
-          }
-        },
-        onError: (err) {
-          debugPrint('[TgMtprotoBridge] WS stream error: $err');
-          _cleanup(clientSocket, ws);
-        },
-        onDone: () {
-          _cleanup(clientSocket, ws);
-        },
-        cancelOnError: true,
-      );
-    }).catchError((e) {
-      debugPrint('[TgMtprotoBridge] WS connect error: $e');
-      _cleanup(clientSocket, ws);
-    });
-  }
-
-  static void _cleanup(Socket clientSocket, WebSocket? ws) {
-    try {
-      clientSocket.destroy();
+      debugPrint('[TgMtprotoBridge] Stopped tg-ws-proxy');
     } catch (_) {}
-    try {
-      ws?.close();
-    } catch (_) {}
-    if (activeConnectionsNotifier.value > 0) {
-      activeConnectionsNotifier.value--;
-    }
   }
 }
