@@ -72,7 +72,10 @@ class TgMtprotoBridge {
     try {
       ws = await WebSocket.connect(
         _workerUrl,
-        headers: {'User-Agent': 'EaveVPN-TgBridge/1.0'},
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
       ).timeout(const Duration(seconds: 10));
 
       // Client TCP -> WebSocket
