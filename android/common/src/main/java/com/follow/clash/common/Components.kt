@@ -3,14 +3,14 @@ package com.follow.clash.common
 import android.content.ComponentName
 
 object Components {
-    const val PACKAGE_NAME = "com.follow.clash"
+    const val PACKAGE_NAME = "com.kirillo4ka.eavevpn"
 
     val mainActivity =
-        ComponentName(GlobalState.packageName, "${PACKAGE_NAME}.MainActivity")
+        ComponentName(GlobalState.packageName, "com.follow.clash.MainActivity")
 
     val quickActionActivity =
-        ComponentName(GlobalState.packageName, "${PACKAGE_NAME}.QuickActionActivity")
+        ComponentName(GlobalState.packageName, "com.follow.clash.QuickActionActivity")
 
     val serviceBroadcastReceiver =
-        ComponentName(GlobalState.packageName, "${PACKAGE_NAME}.ServiceBroadcastReceiver")
+        ComponentName(GlobalState.packageName, "com.follow.clash.ServiceBroadcastReceiver")
 }
