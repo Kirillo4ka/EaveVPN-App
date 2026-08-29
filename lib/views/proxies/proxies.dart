@@ -127,6 +127,13 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final profs = ref.read(profilesProvider);
+      final grps = ref.read(groupsProvider);
+      if (profs.isEmpty || grps.isEmpty) {
+        EaveVpnSync.syncConfigs();
+      }
+    });
     ref.listenManual(providersProvider.select((state) => state.isNotEmpty), (
       prev,
       next,
@@ -338,7 +345,7 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
       actions: _buildActions(context),
       title: context.appLocalizations.proxies,
       searchState: AppBarSearchState(onSearch: _onSearch),
-      body: profiles.isEmpty
+      body: (profiles.isEmpty || ref.watch(groupsProvider).isEmpty)
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -359,14 +366,15 @@ class _ProxiesViewState extends ConsumerState<ProxiesView> {
                     ),
                     const SizedBox(height: 24),
                     Text(
-                      'Загружаем конфигурации...',
+                      'Пожалуйста, подождите, загружаем серверы...',
+                      textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Синхронизация серверов VPN и Обхода блокировок',
+                      'Автоматическая синхронизация и проверка доступности серверов EaveVPN',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context).colorScheme.outline,

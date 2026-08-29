@@ -12,9 +12,9 @@ import 'package:http/http.dart' as http;
 class EaveVpnSync {
   static const String secretKeyStr = 'eavevpn_secure_master_token_key_2026_x77!';
   static const String vpnUrl =
-      'https://raw.githubusercontent.com/Kirillo4ka/configs-EaveVPN-app/main/eavevpn_vpn.enc';
+      'https://raw.githubusercontent.com/Kirillo4ka/eavevpn-automation/main/BLACK_SS+All.txt';
   static const String unblockUrl =
-      'https://raw.githubusercontent.com/Kirillo4ka/configs-EaveVPN-app/main/eavevpn_unblock.enc';
+      'https://raw.githubusercontent.com/Kirillo4ka/eavevpn-automation/main/WHITE-CIDR-all.txt';
 
   // Obfuscated GitHub Token for private config repository access
   static final List<int> _tokenBytes = [
@@ -92,7 +92,18 @@ class EaveVpnSync {
         return null;
       }
 
-      final decryptedContent = decryptEncryptedConfig(response.bodyBytes);
+      String decryptedContent = '';
+      if (url.endsWith('.enc')) {
+        decryptedContent = decryptEncryptedConfig(response.bodyBytes);
+      } else {
+        decryptedContent = utf8.decode(response.bodyBytes, allowMalformed: true);
+        if (!decryptedContent.contains('://')) {
+          try {
+            decryptedContent = decryptEncryptedConfig(response.bodyBytes);
+          } catch (_) {}
+        }
+      }
+
       if (decryptedContent.trim().isEmpty) {
         return null;
       }
