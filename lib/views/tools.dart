@@ -310,6 +310,7 @@ class _InfoItem extends StatelessWidget {
     return ListItem.open(
       leading: const Icon(Icons.info),
       title: Text(context.appLocalizations.about),
+      blur: false,
       widget: const AboutView(),
     );
   }

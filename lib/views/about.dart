@@ -116,6 +116,9 @@ class AboutView extends StatelessWidget {
                           'assets/images/icon.png',
                           width: 64,
                           height: 64,
+                          cacheWidth: 128,
+                          cacheHeight: 128,
+                          filterQuality: FilterQuality.medium,
                         ),
                       ),
                       Column(
@@ -203,7 +206,13 @@ class Avatar extends StatelessWidget {
             width: 38,
             height: 38,
             child: CircleAvatar(
-              foregroundImage: AssetImage(contributor.avatar),
+              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+              foregroundImage: ResizeImage(
+                AssetImage(contributor.avatar),
+                width: 76,
+                height: 76,
+              ),
+              child: const Icon(Icons.person, size: 20),
             ),
           ),
           const SizedBox(height: 4),
