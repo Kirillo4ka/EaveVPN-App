@@ -318,11 +318,10 @@ class GlobalState {
     container.read(commonActionProvider.notifier).autoCheckUpdate();
     autoLaunch?.updateStatus(container.read(appSettingProvider).autoLaunch);
     final isSilentArg = Platform.executableArguments.contains('--silent');
-    final isSilentSetting = container.read(appSettingProvider).silentLaunch;
-    if (!isSilentArg && !isSilentSetting) {
-      window?.show();
-    } else {
+    if (isSilentArg) {
       window?.hide();
+    } else {
+      window?.show();
     }
     final hasPromptedTg = await preferences.getBool('tg_prompted_autostart', false);
     if (!hasPromptedTg) {
