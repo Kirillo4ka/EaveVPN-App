@@ -1,6 +1,7 @@
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/models/models.dart';
 import 'package:fl_clash/views/views.dart';
+import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 
 class Navigation {
@@ -27,7 +28,7 @@ class Navigation {
         modes: const [NavigationItemMode.mobile, NavigationItemMode.desktop],
       ),
       NavigationItem(
-        icon: const Icon(Icons.send_rounded),
+        icon: const TelegramNavIcon(),
         label: PageLabel.tg_proxy,
         builder: (_) =>
             const TgProxyView(key: GlobalObjectKey(PageLabel.tg_proxy)),
