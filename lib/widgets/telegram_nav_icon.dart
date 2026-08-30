@@ -34,21 +34,21 @@ class TelegramPlanePainter extends CustomPainter {
   void _drawPlane(Canvas canvas, double w, double h, Paint paint) {
     final path = Path();
     
-    // Perfectly centered Telegram airplane silhouette
-    path.moveTo(w * 0.88, h * 0.20);
-    path.lineTo(w * 0.16, h * 0.50);
-    path.cubicTo(w * 0.11, h * 0.52, w * 0.11, h * 0.58, w * 0.19, h * 0.61);
-    path.lineTo(w * 0.36, h * 0.67);
-    path.lineTo(w * 0.74, h * 0.34);
-    path.cubicTo(w * 0.77, h * 0.31, w * 0.80, h * 0.34, w * 0.77, h * 0.38);
-    path.lineTo(w * 0.44, h * 0.73);
-    path.lineTo(w * 0.41, h * 0.85);
-    path.cubicTo(w * 0.40, h * 0.90, w * 0.45, h * 0.92, w * 0.49, h * 0.88);
-    path.lineTo(w * 0.60, h * 0.78);
-    path.lineTo(w * 0.78, h * 0.89);
-    path.cubicTo(w * 0.84, h * 0.93, w * 0.89, h * 0.90, w * 0.91, h * 0.83);
-    path.lineTo(w * 0.94, h * 0.27);
-    path.cubicTo(w * 0.96, h * 0.20, w * 0.92, h * 0.17, w * 0.88, h * 0.20);
+    // Mathematically centered Telegram airplane silhouette (center exactly at 0.50, 0.50)
+    path.moveTo(w * 0.83, h * 0.155);
+    path.lineTo(w * 0.11, h * 0.455);
+    path.cubicTo(w * 0.06, h * 0.475, w * 0.06, h * 0.535, w * 0.14, h * 0.565);
+    path.lineTo(w * 0.31, h * 0.625);
+    path.lineTo(w * 0.69, h * 0.295);
+    path.cubicTo(w * 0.72, h * 0.265, w * 0.75, h * 0.295, w * 0.72, h * 0.335);
+    path.lineTo(w * 0.39, h * 0.685);
+    path.lineTo(w * 0.36, h * 0.805);
+    path.cubicTo(w * 0.35, h * 0.855, w * 0.40, h * 0.875, w * 0.44, h * 0.835);
+    path.lineTo(w * 0.55, h * 0.735);
+    path.lineTo(w * 0.73, h * 0.845);
+    path.cubicTo(w * 0.79, h * 0.885, w * 0.84, h * 0.855, w * 0.86, h * 0.785);
+    path.lineTo(w * 0.89, h * 0.225);
+    path.cubicTo(w * 0.91, h * 0.155, w * 0.87, h * 0.125, w * 0.83, h * 0.155);
     path.close();
 
     canvas.drawPath(path, paint);
@@ -63,62 +63,32 @@ class TelegramPlanePainter extends CustomPainter {
 class TelegramNavIcon extends Icon {
   const TelegramNavIcon({
     super.key,
-    super.size = 24.0,
+    super.size,
     super.color,
   }) : super(Icons.send_rounded);
 
   @override
   Widget build(BuildContext context) {
-    final effectiveSize = size ?? 24.0;
+    final iconTheme = IconTheme.of(context);
+    final effectiveSize = size ?? iconTheme.size ?? 24.0;
+    final effectiveColor = color ?? iconTheme.color;
     return ValueListenableBuilder<bool>(
       valueListenable: TgMtprotoBridge.isRunningNotifier,
       builder: (context, isRunning, _) {
-        final activeColor = color ?? const Color(0xFF29B6F6);
         final inactiveColor = Theme.of(context).colorScheme.onSurfaceVariant;
-        final planeColor = isRunning ? activeColor : (color ?? inactiveColor);
+        final planeColor = isRunning ? const Color(0xFF29B6F6) : (effectiveColor ?? inactiveColor);
 
         return SizedBox(
           width: effectiveSize,
           height: effectiveSize,
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.center,
-            children: [
-              CustomPaint(
-                size: Size(effectiveSize, effectiveSize),
-                painter: TelegramPlanePainter(
-                  color: planeColor,
-                  hasGlow: isRunning,
-                ),
+          child: Center(
+            child: CustomPaint(
+              size: Size(effectiveSize, effectiveSize),
+              painter: TelegramPlanePainter(
+                color: planeColor,
+                hasGlow: isRunning,
               ),
-              // Status indicator badge in bottom-right corner with outline
-              Positioned(
-                right: -3,
-                bottom: -3,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  width: isRunning ? 8.0 : 0.0,
-                  height: isRunning ? 8.0 : 0.0,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF22C55E),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.surface,
-                      width: 1.5,
-                    ),
-                    boxShadow: isRunning
-                        ? [
-                            BoxShadow(
-                              color: const Color(0xFF22C55E).withValues(alpha: 0.6),
-                              blurRadius: 4,
-                              spreadRadius: 1,
-                            ),
-                          ]
-                        : null,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         );
       },

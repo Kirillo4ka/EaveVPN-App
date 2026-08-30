@@ -2,9 +2,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/services/tg_mtproto_bridge.dart';
 import 'package:fl_clash/widgets/widgets.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class TgProxyView extends ConsumerStatefulWidget {
   const TgProxyView({super.key});
@@ -17,11 +18,25 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
   final String _proxyHost = '127.0.0.1';
   final int _proxyPort = 1443;
   final String _secret = 'ddb86fd5a64123a081a8eed2b9bbda13ae';
+  bool _autoStart = true;
+  bool _silentMode = true;
 
   @override
   void initState() {
     super.initState();
+    _loadSettings();
     TgMtprotoBridge.start(port: _proxyPort);
+  }
+
+  Future<void> _loadSettings() async {
+    final auto = await preferences.getBool('tg_auto_start', true);
+    final silent = await preferences.getBool('tg_silent_mode', true);
+    if (mounted) {
+      setState(() {
+        _autoStart = auto;
+        _silentMode = silent;
+      });
+    }
   }
 
   String get _mtprotoLink =>
@@ -454,7 +469,103 @@ class _TgProxyViewState extends ConsumerState<TgProxyView> {
                 ),
                 const SizedBox(height: 16),
 
-                // 5. Instruction Card
+                // 5. Settings Card (Auto-start & Silent Mode)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: theme.colorScheme.outlineVariant.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.play_circle_outline_rounded,
+                            size: 22,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Автозапуск TG Прокси',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Автоматически запускать мост при старте EaveVPN',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: _autoStart,
+                            onChanged: (val) async {
+                              setState(() => _autoStart = val);
+                              await preferences.setBool('tg_auto_start', val);
+                            },
+                          ),
+                        ],
+                      ),
+                      Divider(height: 1, color: theme.colorScheme.outlineVariant.withValues(alpha: 0.15)),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.visibility_off_outlined,
+                            size: 22,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Тихий запуск TG Прокси',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Фоновая работа в трее без лишних окон',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: _silentMode,
+                            onChanged: (val) async {
+                              setState(() => _silentMode = val);
+                              await preferences.setBool('tg_silent_mode', val);
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // 6. Instruction Card
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(

@@ -95,6 +95,16 @@ class Preferences {
     return await prefs?.setString(key, value) ?? false;
   }
 
+  Future<bool> getBool(String key, [bool defaultValue = false]) async {
+    final prefs = await sharedPreferencesCompleter.future;
+    return prefs?.getBool(key) ?? defaultValue;
+  }
+
+  Future<bool> setBool(String key, bool value) async {
+    final prefs = await sharedPreferencesCompleter.future;
+    return await prefs?.setBool(key, value) ?? false;
+  }
+
   Future<void> clearPreferences() async {
     final sharedPreferencesIns = await sharedPreferencesCompleter.future;
     await sharedPreferencesIns?.clear();
