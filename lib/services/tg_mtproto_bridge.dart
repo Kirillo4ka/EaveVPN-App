@@ -51,6 +51,7 @@ class TgMtprotoBridge {
         '$appDir\\tg-ws-proxy.exe',
         r'D:\DevTools\EaveVPN-Build\tg-ws-proxy-repo\dist\tg-ws-proxy.exe',
         '${Platform.environment['LOCALAPPDATA']}\\Programs\\EaveVPN\\tg-ws-proxy.exe',
+        r'D:\EaveVPN\tg-ws-proxy.exe',
       ];
 
       String? targetExe;
@@ -84,7 +85,7 @@ class TgMtprotoBridge {
               '--dc-ip',
               '4:149.154.167.91',
               '--dc-ip',
-              '5:149.154.171.5',
+              '5:91.108.56.165',
             ],
             mode: ProcessStartMode.detached,
           );
@@ -134,7 +135,7 @@ class TgMtprotoBridge {
     2: '149.154.167.51',
     3: '149.154.175.100',
     4: '149.154.167.91',
-    5: '149.154.171.5',
+    5: '91.108.56.165',
   };
 
   static void _handleDartClient(Socket clientSocket) {
@@ -145,22 +146,35 @@ class TgMtprotoBridge {
     _DartAesCtr? tgEnc;
     _DartAesCtr? tgDec;
     var isHandshakeDone = false;
-    final buffer = <int>[];
+    var isWsConnecting = false;
+    final handshakeBuffer = <int>[];
+    final pendingToTg = <Uint8List>[];
 
     final secretBytes = Uint8List.fromList([
       for (var i = 0; i < _secretHex.length; i += 2)
         int.parse(_secretHex.substring(i, i + 2), radix: 16)
     ]);
 
+    void sendToTg(Uint8List rawData) {
+      if (cltDec == null || tgEnc == null) return;
+      final plain = cltDec!.process(rawData);
+      final toTg = tgEnc!.process(plain);
+      if (ws != null) {
+        ws!.add(toTg);
+      } else {
+        pendingToTg.add(toTg);
+      }
+    }
+
     clientSocket.listen(
       (chunk) async {
         if (!isHandshakeDone) {
-          buffer.addAll(chunk);
-          if (buffer.length < 64) return;
+          handshakeBuffer.addAll(chunk);
+          if (handshakeBuffer.length < 64) return;
           isHandshakeDone = true;
 
-          final init64 = Uint8List.fromList(buffer.sublist(0, 64));
-          final rest = buffer.length > 64 ? buffer.sublist(64) : <int>[];
+          final init64 = Uint8List.fromList(handshakeBuffer.sublist(0, 64));
+          final rest = handshakeBuffer.length > 64 ? handshakeBuffer.sublist(64) : <int>[];
 
           try {
             // 1. Client key derivation
@@ -188,8 +202,9 @@ class TgMtprotoBridge {
             if (dcIdx > 32767) dcIdx -= 65536;
 
             final dcId = dcIdx.abs() == 0 ? 2 : dcIdx.abs();
+            final isMedia = dcIdx < 0;
             final dstIp = _dcDefaultIps[dcId] ?? '149.154.167.51';
-            debugPrint('[TgMtprotoBridge] Client handshake ok: dcIdx=$dcIdx (DC$dcId -> $dstIp)');
+            debugPrint('[TgMtprotoBridge] Client connect: DC$dcId${isMedia ? " (media)" : ""} -> $dstIp');
 
             // 2. Generate clean relay_init for upstream Telegram DC
             final rnd = Random.secure();
@@ -230,16 +245,31 @@ class TgMtprotoBridge {
             // Fast forward tgEnc past relayInit (64 bytes)
             tgEnc!.process(Uint8List(64));
 
+            // Queue any trailing bytes from initial packet
+            if (rest.isNotEmpty) {
+              sendToTg(Uint8List.fromList(rest));
+            }
+
             // 3. Connect to Cloudflare Worker WebSocket
-            final wsUri = 'wss://$_workerDomain/apiws?dst=$dstIp&dc=$dcId';
+            isWsConnecting = true;
+            final wsUri = 'wss://$_workerDomain/apiws?dst=$dstIp&dc=$dcId&media=${isMedia ? 1 : 0}';
             ws = await WebSocket.connect(
               wsUri,
               headers: {
                 'User-Agent': 'Mozilla/5.0 (Android; Mobile; rv:128.0) Gecko/128.0 Firefox/128.0',
               },
-            ).timeout(const Duration(seconds: 8));
+            ).timeout(const Duration(seconds: 10));
 
+            isWsConnecting = false;
+
+            // Send handshake first
             ws!.add(relayInit);
+
+            // Flush all queued data that arrived while WebSocket was connecting
+            for (final pending in pendingToTg) {
+              ws!.add(pending);
+            }
+            pendingToTg.clear();
 
             ws!.listen(
               (wsData) {
@@ -256,22 +286,13 @@ class TgMtprotoBridge {
                 clientSocket.destroy();
               },
             );
-
-            if (rest.isNotEmpty) {
-              final plain = cltDec!.process(Uint8List.fromList(rest));
-              final toTg = tgEnc!.process(plain);
-              ws!.add(toTg);
-            }
           } catch (e) {
-            debugPrint('[TgMtprotoBridge] Handshake/WS error: $e');
+            debugPrint('[TgMtprotoBridge] Connection failed: $e');
             clientSocket.destroy();
           }
         } else {
-          if (ws != null && cltDec != null && tgEnc != null) {
-            final plain = cltDec!.process(Uint8List.fromList(chunk));
-            final toTg = tgEnc!.process(plain);
-            ws!.add(toTg);
-          }
+          // Handshake already processed -> stream directly to TG (or queue if connecting)
+          sendToTg(Uint8List.fromList(chunk));
         }
       },
       onDone: () {
