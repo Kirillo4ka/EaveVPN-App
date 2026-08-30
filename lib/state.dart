@@ -323,47 +323,56 @@ class GlobalState {
     } else {
       window?.show();
     }
-    final hasPromptedTg = await preferences.getBool('tg_prompted_autostart', false);
-    if (!hasPromptedTg) {
-      Future.delayed(const Duration(milliseconds: 600), () async {
-        if (_context.mounted) {
-          final autoStartChoice = await showCommonDialog<bool>(
-            context: _context,
-            dismissible: false,
-            child: CommonDialog(
-              title: 'Автозапуск TG Прокси',
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(_context).pop(false),
-                  child: const Text('Вручную'),
+    try {
+      final hasPromptedTg = await preferences.getBool('tg_prompted_autostart', false);
+      if (!hasPromptedTg) {
+        Future.delayed(const Duration(milliseconds: 800), () async {
+          try {
+            final ctx = navigatorKey.currentContext;
+            if (ctx != null && ctx.mounted) {
+              final autoStartChoice = await showCommonDialog<bool>(
+                context: ctx,
+                dismissible: false,
+                child: CommonDialog(
+                  title: 'Автозапуск TG Прокси',
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(false),
+                      child: const Text('Вручную'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.of(ctx).pop(true),
+                      child: const Text('Включать автоматически'),
+                    ),
+                  ],
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8.0),
+                    child: Text(
+                      'Включать защищённый мост Telegram автоматически при каждом запуске EaveVPN, чтобы Telegram всегда работал без сбоев?',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                  ),
                 ),
-                FilledButton(
-                  onPressed: () => Navigator.of(_context).pop(true),
-                  child: const Text('Включать автоматически'),
-                ),
-              ],
-              child: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8.0),
-                child: Text(
-                  'Включать защищённый мост Telegram автоматически при каждом запуске EaveVPN, чтобы Telegram всегда работал без сбоев?',
-                  style: TextStyle(fontSize: 14),
-                ),
-              ),
-            ),
-          );
-          await preferences.setBool('tg_prompted_autostart', true);
-          final autoStart = autoStartChoice ?? true;
-          await preferences.setBool('tg_auto_start', autoStart);
-          if (autoStart) {
-            TgMtprotoBridge.start();
+              );
+              await preferences.setBool('tg_prompted_autostart', true);
+              final autoStart = autoStartChoice ?? true;
+              await preferences.setBool('tg_auto_start', autoStart);
+              if (autoStart) {
+                TgMtprotoBridge.start();
+              }
+            }
+          } catch (e) {
+            commonPrint.log('Failed to show TG prompt: $e');
           }
+        });
+      } else {
+        final autoStart = await preferences.getBool('tg_auto_start', true);
+        if (autoStart) {
+          TgMtprotoBridge.start();
         }
-      });
-    } else {
-      final autoStart = await preferences.getBool('tg_auto_start', true);
-      if (autoStart) {
-        TgMtprotoBridge.start();
       }
+    } catch (e) {
+      commonPrint.log('TG auto start init error: $e');
     }
     await _handleFailedPreference();
     await _handlerDisclaimer();
