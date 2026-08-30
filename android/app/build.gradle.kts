@@ -38,8 +38,8 @@ android {
         applicationId = "com.kirillo4ka.eavevpn"
         minSdk = flutter.minSdkVersion
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 100
-        versionName = "1.0.0"
+        versionCode = flutter.versionCode ?: 103
+        versionName = flutter.versionName ?: "1.0.3"
     }
 
     signingConfigs {

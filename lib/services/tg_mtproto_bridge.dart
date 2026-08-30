@@ -76,9 +76,15 @@ class TgMtprotoBridge {
               '--cfproxy-worker-domain',
               _workerDomain,
               '--dc-ip',
-              '2:149.154.167.220',
+              '1:149.154.175.50',
               '--dc-ip',
-              '4:149.154.167.220',
+              '2:149.154.167.51',
+              '--dc-ip',
+              '3:149.154.175.100',
+              '--dc-ip',
+              '4:149.154.167.91',
+              '--dc-ip',
+              '5:149.154.171.5',
             ],
             mode: ProcessStartMode.detached,
           );
@@ -91,28 +97,45 @@ class TgMtprotoBridge {
       }
     }
 
-    // Android / macOS / Linux / Pure Dart Bridge
+    // Android / iOS / Linux / macOS Pure Dart Bridge
     return await _startDartBridge();
   }
 
   static Future<bool> _startDartBridge() async {
     try {
-      _serverSocket = await ServerSocket.bind(InternetAddress.loopbackIPv4, _port);
+      _serverSocket = await ServerSocket.bind(InternetAddress.anyIPv4, _port, shared: true);
       _isRunning = true;
       isRunningNotifier.value = true;
-      debugPrint('[TgMtprotoBridge] Native Dart bridge started on 127.0.0.1:$_port');
+      debugPrint('[TgMtprotoBridge] Native Dart bridge started on 0.0.0.0:$_port');
 
       _serverSocket!.listen(_handleDartClient, onError: (err) {
         debugPrint('[TgMtprotoBridge] Server socket error: $err');
       });
       return true;
     } catch (e) {
-      debugPrint('[TgMtprotoBridge] Dart bridge start failed: $e');
-      _isRunning = false;
-      isRunningNotifier.value = false;
-      return false;
+      debugPrint('[TgMtprotoBridge] Dart bridge start failed on anyIPv4: $e, trying loopback...');
+      try {
+        _serverSocket = await ServerSocket.bind(InternetAddress.loopbackIPv4, _port);
+        _isRunning = true;
+        isRunningNotifier.value = true;
+        _serverSocket!.listen(_handleDartClient);
+        return true;
+      } catch (err2) {
+        debugPrint('[TgMtprotoBridge] Dart bridge fallback start failed: $err2');
+        _isRunning = false;
+        isRunningNotifier.value = false;
+        return false;
+      }
     }
   }
+
+  static const Map<int, String> _dcDefaultIps = {
+    1: '149.154.175.50',
+    2: '149.154.167.51',
+    3: '149.154.175.100',
+    4: '149.154.167.91',
+    5: '149.154.171.5',
+  };
 
   static void _handleDartClient(Socket clientSocket) {
     activeConnectionsNotifier.value++;
@@ -164,12 +187,9 @@ class TgMtprotoBridge {
             var dcIdx = decryptedHeader[60] | (decryptedHeader[61] << 8);
             if (dcIdx > 32767) dcIdx -= 65536;
 
-            final dcId = dcIdx.abs();
-            debugPrint('[TgMtprotoBridge] Client handshake ok: dcIdx=$dcIdx (DC$dcId)');
-
-            var dstIp = '149.154.167.220';
-            if (dcId == 1) dstIp = '149.154.175.50';
-            if (dcId == 5) dstIp = '91.108.56.165';
+            final dcId = dcIdx.abs() == 0 ? 2 : dcIdx.abs();
+            final dstIp = _dcDefaultIps[dcId] ?? '149.154.167.51';
+            debugPrint('[TgMtprotoBridge] Client handshake ok: dcIdx=$dcIdx (DC$dcId -> $dstIp)');
 
             // 2. Generate clean relay_init for upstream Telegram DC
             final rnd = Random.secure();
@@ -211,7 +231,7 @@ class TgMtprotoBridge {
             tgEnc!.process(Uint8List(64));
 
             // 3. Connect to Cloudflare Worker WebSocket
-            final wsUri = 'wss://$_workerDomain/apiws?dst=$dstIp';
+            final wsUri = 'wss://$_workerDomain/apiws?dst=$dstIp&dc=$dcId';
             ws = await WebSocket.connect(
               wsUri,
               headers: {
