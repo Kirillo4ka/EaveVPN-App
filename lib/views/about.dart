@@ -129,7 +129,7 @@ class AboutView extends StatelessWidget {
                             style: Theme.of(context).textTheme.headlineSmall,
                           ),
                           Text(
-                            'v1.0.0',
+                            'v1.0.3',
                             style: Theme.of(context).textTheme.labelLarge,
                           ),
                         ],
@@ -163,6 +163,7 @@ class AboutView extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
+              '• Встроенный Telegram MTProto мост через защищённый WebSocket\n'
               '• Автоматическая загрузка зашифрованных серверов\n'
               '• Быстрый TCP Handshake замер задержки серверов\n'
               '• Авто-маскировка uTLS Chrome для обхода блокировок\n'

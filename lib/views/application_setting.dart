@@ -252,13 +252,12 @@ class ApplicationSettingView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final List<Widget> items = [
-      const MinimizeItem(),
+      if (system.isDesktop) const MinimizeItem(),
       if (system.isDesktop) ...[
         const AutoLaunchItem(),
         const SilentLaunchItem(),
       ],
       const AutoRunItem(),
-      if (system.isAndroid) ...[const HiddenItem()],
       const AnimateTabItem(),
       const OpenLogsItem(),
       const CloseConnectionsItem(),
