@@ -22,6 +22,7 @@ import 'enum/enum.dart';
 import 'l10n/l10n.dart';
 import 'models/models.dart';
 import 'providers/providers.dart';
+import 'services/tg_mtproto_bridge.dart';
 
 class GlobalState {
   static GlobalState? _instance;
@@ -316,11 +317,14 @@ class GlobalState {
     container.read(profilesActionProvider.notifier).autoUpdateProfiles();
     container.read(commonActionProvider.notifier).autoCheckUpdate();
     autoLaunch?.updateStatus(container.read(appSettingProvider).autoLaunch);
-    if (!container.read(appSettingProvider).silentLaunch) {
+    final isSilentArg = Platform.executableArguments.contains('--silent');
+    final isSilentSetting = container.read(appSettingProvider).silentLaunch;
+    if (!isSilentArg && !isSilentSetting) {
       window?.show();
     } else {
       window?.hide();
     }
+    TgMtprotoBridge.start();
     await _handleFailedPreference();
     await _handlerDisclaimer();
     await _showCrashRecoveryTip();

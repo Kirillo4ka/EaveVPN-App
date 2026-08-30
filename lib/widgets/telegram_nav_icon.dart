@@ -23,8 +23,8 @@ class TelegramPlanePainter extends CustomPainter {
 
     if (hasGlow) {
       final glowPaint = Paint()
-        ..color = color.withOpacity(0.35)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
+        ..color = color.withValues(alpha: 0.3)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
       _drawPlane(canvas, w, h, glowPaint);
     }
 
@@ -32,33 +32,23 @@ class TelegramPlanePainter extends CustomPainter {
   }
 
   void _drawPlane(Canvas canvas, double w, double h, Paint paint) {
-    // Official Telegram paper airplane vector path normalized to width & height
     final path = Path();
     
-    // Top right point (nose of the airplane)
-    path.moveTo(w * 0.88, h * 0.16);
-    // Main wing edge down to bottom left
-    path.lineTo(w * 0.14, h * 0.49);
-    // Back curve of left wing
-    path.cubicTo(w * 0.09, h * 0.51, w * 0.09, h * 0.57, w * 0.17, h * 0.60);
-    // Bottom fold to inner wing
-    path.lineTo(w * 0.35, h * 0.67);
-    // Inner fold line to nose
-    path.lineTo(w * 0.76, h * 0.30);
-    // Nose curve
-    path.cubicTo(w * 0.79, h * 0.27, w * 0.82, h * 0.30, w * 0.79, h * 0.34);
-    // Inner wing to keel bottom
-    path.lineTo(w * 0.43, h * 0.73);
-    // Keel fin
-    path.lineTo(w * 0.40, h * 0.86);
-    path.cubicTo(w * 0.39, h * 0.91, w * 0.44, h * 0.93, w * 0.48, h * 0.89);
+    // Perfectly centered Telegram airplane silhouette
+    path.moveTo(w * 0.88, h * 0.20);
+    path.lineTo(w * 0.16, h * 0.50);
+    path.cubicTo(w * 0.11, h * 0.52, w * 0.11, h * 0.58, w * 0.19, h * 0.61);
+    path.lineTo(w * 0.36, h * 0.67);
+    path.lineTo(w * 0.74, h * 0.34);
+    path.cubicTo(w * 0.77, h * 0.31, w * 0.80, h * 0.34, w * 0.77, h * 0.38);
+    path.lineTo(w * 0.44, h * 0.73);
+    path.lineTo(w * 0.41, h * 0.85);
+    path.cubicTo(w * 0.40, h * 0.90, w * 0.45, h * 0.92, w * 0.49, h * 0.88);
     path.lineTo(w * 0.60, h * 0.78);
-    // Right wing outer edge
-    path.lineTo(w * 0.80, h * 0.91);
-    path.cubicTo(w * 0.86, h * 0.95, w * 0.91, h * 0.92, w * 0.93, h * 0.84);
-    // Leading edge back to nose
-    path.lineTo(w * 0.96, h * 0.23);
-    path.cubicTo(w * 0.98, h * 0.16, w * 0.94, h * 0.13, w * 0.88, h * 0.16);
+    path.lineTo(w * 0.78, h * 0.89);
+    path.cubicTo(w * 0.84, h * 0.93, w * 0.89, h * 0.90, w * 0.91, h * 0.83);
+    path.lineTo(w * 0.94, h * 0.27);
+    path.cubicTo(w * 0.96, h * 0.20, w * 0.92, h * 0.17, w * 0.88, h * 0.20);
     path.close();
 
     canvas.drawPath(path, paint);
@@ -88,38 +78,39 @@ class TelegramNavIcon extends Icon {
         final planeColor = isRunning ? activeColor : (color ?? inactiveColor);
 
         return SizedBox(
-          width: effectiveSize + 4,
-          height: effectiveSize + 4,
+          width: effectiveSize,
+          height: effectiveSize,
           child: Stack(
             clipBehavior: Clip.none,
+            alignment: Alignment.center,
             children: [
-              Center(
-                child: CustomPaint(
-                  size: Size(effectiveSize, effectiveSize),
-                  painter: TelegramPlanePainter(
-                    color: planeColor,
-                    hasGlow: isRunning,
-                  ),
+              CustomPaint(
+                size: Size(effectiveSize, effectiveSize),
+                painter: TelegramPlanePainter(
+                  color: planeColor,
+                  hasGlow: isRunning,
                 ),
               ),
-              // State indicator badge (Green pulsing/glowing dot when active)
+              // Status indicator badge in bottom-right corner with outline
               Positioned(
-                right: 0,
-                top: 0,
+                right: -3,
+                bottom: -3,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
-                  width: isRunning ? 8.0 : 6.0,
-                  height: isRunning ? 8.0 : 6.0,
+                  width: isRunning ? 8.0 : 0.0,
+                  height: isRunning ? 8.0 : 0.0,
                   decoration: BoxDecoration(
-                    color: isRunning
-                        ? const Color(0xFF22C55E)
-                        : Colors.transparent,
+                    color: const Color(0xFF22C55E),
                     shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.surface,
+                      width: 1.5,
+                    ),
                     boxShadow: isRunning
                         ? [
                             BoxShadow(
-                              color: const Color(0xFF22C55E).withOpacity(0.7),
-                              blurRadius: 5,
+                              color: const Color(0xFF22C55E).withValues(alpha: 0.6),
+                              blurRadius: 4,
                               spreadRadius: 1,
                             ),
                           ]

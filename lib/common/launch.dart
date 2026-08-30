@@ -14,6 +14,7 @@ class AutoLaunch {
     launchAtStartup.setup(
       appName: appName,
       appPath: Platform.resolvedExecutable,
+      args: ['--silent'],
     );
   }
 
