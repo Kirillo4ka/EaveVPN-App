@@ -146,7 +146,6 @@ class TgMtprotoBridge {
     _DartAesCtr? tgEnc;
     _DartAesCtr? tgDec;
     var isHandshakeDone = false;
-    var isWsConnecting = false;
     final handshakeBuffer = <int>[];
     final pendingToTg = <Uint8List>[];
 
@@ -157,12 +156,16 @@ class TgMtprotoBridge {
 
     void sendToTg(Uint8List rawData) {
       if (cltDec == null || tgEnc == null) return;
-      final plain = cltDec!.process(rawData);
-      final toTg = tgEnc!.process(plain);
-      if (ws != null) {
-        ws!.add(toTg);
-      } else {
-        pendingToTg.add(toTg);
+      try {
+        final plain = cltDec!.process(rawData);
+        final toTg = tgEnc!.process(plain);
+        if (ws != null) {
+          ws!.add(toTg);
+        } else {
+          pendingToTg.add(toTg);
+        }
+      } catch (e) {
+        debugPrint('[TgMtprotoBridge] sendToTg error: $e');
       }
     }
 
@@ -251,7 +254,6 @@ class TgMtprotoBridge {
             }
 
             // 3. Connect to Cloudflare Worker WebSocket
-            isWsConnecting = true;
             final wsUri = 'wss://$_workerDomain/apiws?dst=$dstIp&dc=$dcId&media=${isMedia ? 1 : 0}';
             ws = await WebSocket.connect(
               wsUri,
@@ -259,8 +261,6 @@ class TgMtprotoBridge {
                 'User-Agent': 'Mozilla/5.0 (Android; Mobile; rv:128.0) Gecko/128.0 Firefox/128.0',
               },
             ).timeout(const Duration(seconds: 10));
-
-            isWsConnecting = false;
 
             // Send handshake first
             ws!.add(relayInit);
@@ -274,9 +274,13 @@ class TgMtprotoBridge {
             ws!.listen(
               (wsData) {
                 if (wsData is List<int> && wsData.isNotEmpty) {
-                  final plain = tgDec!.process(Uint8List.fromList(wsData));
-                  final toClient = cltEnc!.process(plain);
-                  clientSocket.add(toClient);
+                  try {
+                    final plain = tgDec!.process(Uint8List.fromList(wsData));
+                    final toClient = cltEnc!.process(plain);
+                    clientSocket.add(toClient);
+                  } catch (err) {
+                    debugPrint('[TgMtprotoBridge] ws decode error: $err');
+                  }
                 }
               },
               onDone: () {
@@ -291,7 +295,6 @@ class TgMtprotoBridge {
             clientSocket.destroy();
           }
         } else {
-          // Handshake already processed -> stream directly to TG (or queue if connecting)
           sendToTg(Uint8List.fromList(chunk));
         }
       },
