@@ -181,6 +181,7 @@ class TgMtprotoBridge {
       if (targetExe != null) {
         try {
           Process.runSync('taskkill', ['/F', '/IM', 'tg-ws-proxy.exe', '/T']);
+          await Future.delayed(const Duration(milliseconds: 200));
           debugPrint('[TgMtprotoBridge] Starting $targetExe on port $_port with domain $_workerDomain');
           _process = await Process.start(
             targetExe,
@@ -387,13 +388,14 @@ class TgMtprotoBridge {
       _process?.kill(ProcessSignal.sigterm);
       _process = null;
       if (Platform.isWindows) {
-        Process.run('taskkill', ['/F', '/IM', 'tg-ws-proxy.exe', '/T']);
+        Process.runSync('taskkill', ['/F', '/IM', 'tg-ws-proxy.exe', '/T']);
       }
     } catch (_) {}
     try {
       await _serverSocket?.close();
       _serverSocket = null;
     } catch (_) {}
+    await Future.delayed(const Duration(milliseconds: 200));
     debugPrint('[TgMtprotoBridge] Stopped');
   }
 }
