@@ -1,5 +1,6 @@
 import 'package:fl_clash/common/common.dart';
-import 'package:fl_clash/providers/config.dart';
+import 'package:fl_clash/plugins/app.dart';
+import 'package:fl_clash/providers/providers.dart';
 import 'package:fl_clash/widgets/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -246,12 +247,53 @@ class AutoCheckUpdateItem extends ConsumerWidget {
   }
 }
 
+class BatteryOptimizationItem extends ConsumerWidget {
+  const BatteryOptimizationItem({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appLocalizations = context.appLocalizations;
+    final isOptimizationDisabled = ref.watch(batteryOptimizationDisableProvider);
+
+    return ListItem(
+      leading: Icon(
+        isOptimizationDisabled ? Icons.battery_charging_full_rounded : Icons.battery_alert_rounded,
+        color: isOptimizationDisabled ? Colors.green : Theme.of(context).colorScheme.error,
+      ),
+      title: Text(appLocalizations.ignoreBatteryOptimization),
+      subtitle: Text(
+        isOptimizationDisabled
+            ? 'Фоновый режим активен: система не будет усыплять VPN и прокси.'
+            : 'Рекомендуется отключить оптимизацию батареи для стабильной работы VPN и TG прокси в фоне. Нажмите для настройки.',
+      ),
+      trailing: isOptimizationDisabled
+          ? const Chip(
+              label: Text('Отключено', style: TextStyle(color: Colors.green, fontSize: 12)),
+              backgroundColor: Color(0x1A4CAF50),
+              side: BorderSide.none,
+            )
+          : FilledButton.tonal(
+              onPressed: () {
+                permissions.needWaitingBatteryOptimizationSettings = true;
+                app?.openBatteryOptimizationSettings();
+              },
+              child: const Text('Настроить'),
+            ),
+      onTap: () {
+        permissions.needWaitingBatteryOptimizationSettings = true;
+        app?.openBatteryOptimizationSettings();
+      },
+    );
+  }
+}
+
 class ApplicationSettingView extends StatelessWidget {
   const ApplicationSettingView({super.key});
 
   @override
   Widget build(BuildContext context) {
     final List<Widget> items = [
+      if (system.isAndroid) const BatteryOptimizationItem(),
       if (system.isDesktop) const MinimizeItem(),
       if (system.isDesktop) ...[
         const AutoLaunchItem(),

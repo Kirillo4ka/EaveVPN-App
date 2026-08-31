@@ -64,6 +64,7 @@ class TgMtprotoBridge {
 
       if (targetExe != null) {
         try {
+          // Only kill if port is occupied or process is not alive
           Process.runSync('taskkill', ['/F', '/IM', 'tg-ws-proxy.exe', '/T']);
           await Future.delayed(const Duration(milliseconds: 200));
           debugPrint('[TgMtprotoBridge] Starting $targetExe on port $_port with domain $_workerDomain');
@@ -98,7 +99,7 @@ class TgMtprotoBridge {
       }
     }
 
-    // Android / iOS / Linux / macOS Pure Dart Bridge
+    // Android / iOS / Linux / macOS Pure Dart High-Speed Bridge
     return await _startDartBridge();
   }
 
@@ -137,6 +138,35 @@ class TgMtprotoBridge {
     4: '149.154.167.91',
     5: '91.108.56.165',
   };
+
+  static Future<WebSocket> _connectUpstream(int dcId, bool isMedia, String dstIp) async {
+    // 1. First priority: Direct Official Telegram WebSockets (Maximum speed, zero Cloudflare limits)
+    final domainCandidates = isMedia
+        ? ['kws$dcId-1.web.telegram.org', 'kws$dcId.web.telegram.org']
+        : ['kws$dcId.web.telegram.org', 'kws$dcId-1.web.telegram.org'];
+
+    for (final domain in domainCandidates) {
+      try {
+        final directWs = await WebSocket.connect(
+          'wss://$domain/apiws',
+          protocols: ['binary'],
+        ).timeout(const Duration(seconds: 3));
+        return directWs;
+      } catch (_) {
+        // Continue to next candidate
+      }
+    }
+
+    // 2. Fallback: Cloudflare Worker
+    final wsUri = 'wss://$_workerDomain/apiws?dst=$dstIp&dc=$dcId&media=${isMedia ? 1 : 0}';
+    return await WebSocket.connect(
+      wsUri,
+      protocols: ['binary'],
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Android; Mobile; rv:128.0) Gecko/128.0 Firefox/128.0',
+      },
+    ).timeout(const Duration(seconds: 8));
+  }
 
   static void _handleDartClient(Socket clientSocket) {
     activeConnectionsNotifier.value++;
@@ -207,7 +237,6 @@ class TgMtprotoBridge {
             final dcId = dcIdx.abs() == 0 ? 2 : dcIdx.abs();
             final isMedia = dcIdx < 0;
             final dstIp = _dcDefaultIps[dcId] ?? '149.154.167.51';
-            debugPrint('[TgMtprotoBridge] Client connect: DC$dcId${isMedia ? " (media)" : ""} -> $dstIp');
 
             // 2. Generate clean relay_init for upstream Telegram DC
             final rnd = Random.secure();
@@ -253,14 +282,8 @@ class TgMtprotoBridge {
               sendToTg(Uint8List.fromList(rest));
             }
 
-            // 3. Connect to Cloudflare Worker WebSocket
-            final wsUri = 'wss://$_workerDomain/apiws?dst=$dstIp&dc=$dcId&media=${isMedia ? 1 : 0}';
-            ws = await WebSocket.connect(
-              wsUri,
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Android; Mobile; rv:128.0) Gecko/128.0 Firefox/128.0',
-              },
-            ).timeout(const Duration(seconds: 10));
+            // 3. Connect to Upstream (Direct Telegram WebSockets or Cloudflare Fallback)
+            ws = await _connectUpstream(dcId, isMedia, dstIp);
 
             // Send handshake first
             ws!.add(relayInit);
