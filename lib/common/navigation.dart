@@ -32,7 +32,7 @@ class Navigation {
         label: PageLabel.tg_proxy,
         builder: (_) =>
             const TgProxyView(key: GlobalObjectKey(PageLabel.tg_proxy)),
-        modes: const [NavigationItemMode.mobile, NavigationItemMode.desktop],
+        modes: const [NavigationItemMode.desktop],
       ),
       NavigationItem(
         icon: const Icon(Icons.settings),

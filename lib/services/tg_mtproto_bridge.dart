@@ -38,6 +38,10 @@ class TgMtprotoBridge {
   }
 
   static Future<bool> start({int port = defaultPort}) async {
+    if (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) {
+      return false;
+    }
+
     if (_isRunning) {
       if (_port == port) return true;
       await stop();
