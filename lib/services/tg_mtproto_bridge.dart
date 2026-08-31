@@ -65,6 +65,7 @@ class TgMtprotoBridge {
       if (targetExe != null) {
         try {
           Process.runSync('taskkill', ['/F', '/IM', 'tg-ws-proxy.exe', '/T']);
+          Process.runSync('taskkill', ['/F', '/IM', 'TgWsProxy_windows_7_64bit.exe', '/T']);
           await Future.delayed(const Duration(milliseconds: 200));
           debugPrint('[TgMtprotoBridge] Starting $targetExe on port $_port with domain $_workerDomain');
           _process = await Process.start(
@@ -138,35 +139,6 @@ class TgMtprotoBridge {
     5: '91.108.56.165',
   };
 
-  static Future<WebSocket> _connectUpstream(int dcId, bool isMedia, String dstIp) async {
-    // 1. First priority: Direct Official Telegram WebSockets (Maximum speed, zero Cloudflare limits)
-    final domainCandidates = isMedia
-        ? ['kws$dcId-1.web.telegram.org', 'kws$dcId.web.telegram.org']
-        : ['kws$dcId.web.telegram.org', 'kws$dcId-1.web.telegram.org'];
-
-    for (final domain in domainCandidates) {
-      try {
-        final directWs = await WebSocket.connect(
-          'wss://$domain/apiws',
-          protocols: ['binary'],
-        ).timeout(const Duration(seconds: 3));
-        return directWs;
-      } catch (_) {
-        // Fall through to next candidate
-      }
-    }
-
-    // 2. Fallback: Cloudflare Worker
-    final wsUri = 'wss://$_workerDomain/apiws?dst=$dstIp&dc=$dcId&media=${isMedia ? 1 : 0}';
-    return await WebSocket.connect(
-      wsUri,
-      protocols: ['binary'],
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Android; Mobile; rv:128.0) Gecko/128.0 Firefox/128.0',
-      },
-    ).timeout(const Duration(seconds: 8));
-  }
-
   static void _handleDartClient(Socket clientSocket) {
     activeConnectionsNotifier.value++;
     WebSocket? ws;
@@ -174,7 +146,6 @@ class TgMtprotoBridge {
     _DartAesCtr? cltEnc;
     _DartAesCtr? tgEnc;
     _DartAesCtr? tgDec;
-    _DartMsgSplitter? splitter;
     var isHandshakeDone = false;
     final handshakeBuffer = <int>[];
     final pendingToTg = <Uint8List>[];
@@ -185,17 +156,14 @@ class TgMtprotoBridge {
     ]);
 
     void sendToTg(Uint8List rawData) {
-      if (cltDec == null || tgEnc == null || splitter == null) return;
+      if (cltDec == null || tgEnc == null) return;
       try {
         final plain = cltDec!.process(rawData);
-        final packets = splitter!.split(plain);
-        for (final pkt in packets) {
-          final toTg = tgEnc!.process(pkt);
-          if (ws != null) {
-            ws!.add(toTg);
-          } else {
-            pendingToTg.add(toTg);
-          }
+        final toTg = tgEnc!.process(plain);
+        if (ws != null) {
+          ws!.add(toTg);
+        } else {
+          pendingToTg.add(toTg);
         }
       } catch (e) {
         debugPrint('[TgMtprotoBridge] sendToTg error: $e');
@@ -234,8 +202,6 @@ class TgMtprotoBridge {
             // Decrypt 64-byte handshake header to extract protoTag & dcIdx
             final decryptedHeader = cltDec!.process(init64);
             final protoTag = decryptedHeader.sublist(56, 60);
-            final protoTagInt = protoTag[0] | (protoTag[1] << 8) | (protoTag[2] << 16) | (protoTag[3] << 24);
-            splitter = _DartMsgSplitter(protoTagInt);
 
             var dcIdx = decryptedHeader[60] | (decryptedHeader[61] << 8);
             if (dcIdx > 32767) dcIdx -= 65536;
@@ -288,8 +254,14 @@ class TgMtprotoBridge {
               sendToTg(Uint8List.fromList(rest));
             }
 
-            // 3. Connect to Upstream (Direct Telegram WebSockets or Cloudflare Fallback)
-            ws = await _connectUpstream(dcId, isMedia, dstIp);
+            // 3. Connect to Upstream Cloudflare Worker
+            final wsUri = 'wss://$_workerDomain/apiws?dst=$dstIp&dc=$dcId&media=${isMedia ? 1 : 0}';
+            ws = await WebSocket.connect(
+              wsUri,
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              },
+            ).timeout(const Duration(seconds: 8));
 
             // Send handshake first
             ws!.add(relayInit);
@@ -347,6 +319,7 @@ class TgMtprotoBridge {
       _process = null;
       if (Platform.isWindows) {
         Process.runSync('taskkill', ['/F', '/IM', 'tg-ws-proxy.exe', '/T']);
+        Process.runSync('taskkill', ['/F', '/IM', 'TgWsProxy_windows_7_64bit.exe', '/T']);
       }
     } catch (_) {}
     try {
@@ -355,69 +328,6 @@ class TgMtprotoBridge {
     } catch (_) {}
     await Future.delayed(const Duration(milliseconds: 200));
     debugPrint('[TgMtprotoBridge] Stopped');
-  }
-}
-
-/// Splits MTProto transport stream data into discrete protocol packets
-class _DartMsgSplitter {
-  final int protoTagInt;
-  final List<int> _plainBuf = <int>[];
-
-  _DartMsgSplitter(this.protoTagInt);
-
-  List<Uint8List> split(Uint8List plainChunk) {
-    if (plainChunk.isEmpty) return const [];
-    _plainBuf.addAll(plainChunk);
-
-    final parts = <Uint8List>[];
-    var offset = 0;
-    final totalLen = _plainBuf.length;
-
-    while (offset < totalLen) {
-      final avail = totalLen - offset;
-      final packetLen = _nextPacketLen(offset, avail);
-      if (packetLen == null || packetLen <= 0) break;
-      if (avail < packetLen) break;
-
-      final packet = Uint8List.fromList(_plainBuf.sublist(offset, offset + packetLen));
-      parts.add(packet);
-      offset += packetLen;
-    }
-
-    if (offset > 0) {
-      _plainBuf.removeRange(0, offset);
-    }
-    return parts;
-  }
-
-  int? _nextPacketLen(int offset, int avail) {
-    if (avail <= 0) return null;
-
-    // Abridged: protoTag == 0xefefefef or 0xef
-    if (protoTagInt == 0xefefefef || (protoTagInt & 0xff) == 0xef) {
-      final first = _plainBuf[offset];
-      if (first == 0x7f || first == 0xff) {
-        if (avail < 4) return null;
-        final payloadLen = (_plainBuf[offset + 1] |
-            (_plainBuf[offset + 2] << 8) |
-            (_plainBuf[offset + 3] << 16)) * 4;
-        if (payloadLen <= 0) return 0;
-        return 4 + payloadLen;
-      } else {
-        final payloadLen = (first & 0x7f) * 4;
-        if (payloadLen <= 0) return 0;
-        return 1 + payloadLen;
-      }
-    }
-
-    // Intermediate: 0xeeeeeeee or Padded: 0xdddddddd
-    if (avail < 4) return null;
-    final payloadLen = (_plainBuf[offset] |
-        (_plainBuf[offset + 1] << 8) |
-        (_plainBuf[offset + 2] << 16) |
-        (_plainBuf[offset + 3] << 24)) & 0x7fffffff;
-    if (payloadLen <= 0) return 0;
-    return 4 + payloadLen;
   }
 }
 
