@@ -319,7 +319,6 @@ extension GeoResourceExt on GeoResource {
 enum PageLabel {
   dashboard,
   proxies,
-  tg_proxy,
   profiles,
   tools,
   logs,

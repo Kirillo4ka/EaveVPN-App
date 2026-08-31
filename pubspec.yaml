@@ -1,7 +1,7 @@
 name: fl_clash
-description: "EaveVPN - Fast, Secure, and Free Proxy Client"
+description: "A multi-platform Clash client, supporting Clash Premium, Clash.Meta(Mihomo)."
 publish_to: "none"
-version: 1.0.4+104
+version: 1.0.5+105
 environment:
   sdk: '>=3.8.0 <4.0.0'
 

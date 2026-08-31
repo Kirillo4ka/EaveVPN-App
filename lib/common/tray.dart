@@ -7,8 +7,6 @@ import 'package:fl_clash/state.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:tray_manager/tray_manager.dart';
-
-import 'package:fl_clash/services/tg_mtproto_bridge.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'app_localizations.dart';
@@ -184,43 +182,6 @@ class Tray {
     );
     menuItems.add(autoStartMenuItem);
     menuItems.add(copyEnvVarMenuItem);
-    
-    // Telegram MTProto Proxy Menu Item
-    menuItems.add(MenuItem.separator());
-    final isTgRunning = TgMtprotoBridge.isRunning;
-    final tgProxySubmenu = MenuItem.submenu(
-      label: isTgRunning ? '✈️ TG Прокси (Включен 🟢)' : '✈️ TG Прокси (Отключен ⚪)',
-      submenu: Menu(
-        items: [
-          MenuItem(
-            label: isTgRunning ? '🔴 Отключить TG Прокси' : '🟢 Включить TG Прокси',
-            onClick: (_) async {
-              if (TgMtprotoBridge.isRunning) {
-                await TgMtprotoBridge.stop();
-              } else {
-                await TgMtprotoBridge.start();
-              }
-              await update(trayState: trayState, traffic: traffic);
-            },
-          ),
-          MenuItem(
-            label: '🚀 Подключить в Telegram (1 клик)',
-            onClick: (_) async {
-              if (!TgMtprotoBridge.isRunning) {
-                await TgMtprotoBridge.start();
-                await update(trayState: trayState, traffic: traffic);
-              }
-              final uri = Uri.parse(
-                'tg://proxy?server=127.0.0.1&port=${TgMtprotoBridge.port}&secret=${TgMtprotoBridge.secret}',
-              );
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
-            },
-          ),
-        ],
-      ),
-    );
-    menuItems.add(tgProxySubmenu);
-
     menuItems.add(MenuItem.separator());
     final exitMenuItem = MenuItem(
       label: appLocalizations.exit,

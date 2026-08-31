@@ -1,7 +1,6 @@
 import 'package:fl_clash/common/common.dart';
 import 'package:fl_clash/providers/action.dart';
 import 'package:fl_clash/providers/state.dart';
-import 'package:fl_clash/services/tg_mtproto_bridge.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tray_manager/tray_manager.dart';
@@ -35,11 +34,6 @@ class _TrayContainerState extends ConsumerState<TrayManager> with TrayListener {
         }
       });
     }
-    TgMtprotoBridge.isRunningNotifier.addListener(_onTgBridgeChanged);
-  }
-
-  void _onTgBridgeChanged() {
-    ref.read(systemActionProvider.notifier).updateTray();
   }
 
   @override
@@ -67,7 +61,6 @@ class _TrayContainerState extends ConsumerState<TrayManager> with TrayListener {
   @override
   void dispose() {
     trayManager.removeListener(this);
-    TgMtprotoBridge.isRunningNotifier.removeListener(_onTgBridgeChanged);
     super.dispose();
   }
 }

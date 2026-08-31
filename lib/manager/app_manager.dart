@@ -220,9 +220,7 @@ class AppSidebarContainer extends ConsumerWidget {
                                         (e) => NavigationRailDestination(
                                           icon: e.icon,
                                           label: Text(
-                                            e.label == PageLabel.tg_proxy
-                                                ? 'TG Прокси'
-                                                : Intl.message(e.label.name),
+                                            Intl.message(e.label.name),
                                           ),
                                         ),
                                     )
