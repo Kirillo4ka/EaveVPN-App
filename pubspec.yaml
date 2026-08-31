@@ -1,7 +1,7 @@
 name: fl_clash
-description: EaveVPN - Fast, Secure & Modern Multi-platform VPN Client
-publish_to: 'none'
-version: 1.0.3+103
+description: "EaveVPN - Fast, Secure, and Free Proxy Client"
+publish_to: "none"
+version: 1.0.4+104
 environment:
   sdk: '>=3.8.0 <4.0.0'
 
