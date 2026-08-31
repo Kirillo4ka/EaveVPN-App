@@ -45,7 +45,9 @@ class HomePage extends ConsumerWidget {
                       .map(
                         (e) => NavigationDestination(
                           icon: e.icon,
-                          label: Intl.message(e.label.name),
+                          label: e.label == PageLabel.tg_proxy
+                              ? 'TG Прокси'
+                              : Intl.message(e.label.name),
                         ),
                       )
                       .toList(),

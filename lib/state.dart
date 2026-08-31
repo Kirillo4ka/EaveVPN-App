@@ -22,6 +22,7 @@ import 'enum/enum.dart';
 import 'l10n/l10n.dart';
 import 'models/models.dart';
 import 'providers/providers.dart';
+import 'services/tg_mtproto_bridge.dart';
 
 class GlobalState {
   static GlobalState? _instance;
@@ -321,6 +322,12 @@ class GlobalState {
       window?.hide();
     } else {
       window?.show();
+    }
+    if (system.isDesktop) {
+      final autoStart = await preferences.getBool('tg_auto_start', true);
+      if (autoStart) {
+        TgMtprotoBridge.start();
+      }
     }
     await _handleFailedPreference();
     await _handlerDisclaimer();

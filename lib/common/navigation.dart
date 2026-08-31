@@ -28,6 +28,13 @@ class Navigation {
         modes: const [NavigationItemMode.mobile, NavigationItemMode.desktop],
       ),
       NavigationItem(
+        icon: const TelegramNavIcon(),
+        label: PageLabel.tg_proxy,
+        builder: (_) =>
+            const TgProxyView(key: GlobalObjectKey(PageLabel.tg_proxy)),
+        modes: const [NavigationItemMode.desktop],
+      ),
+      NavigationItem(
         icon: const Icon(Icons.settings),
         label: PageLabel.tools,
         builder: (_) => const ToolsView(key: GlobalObjectKey(PageLabel.tools)),

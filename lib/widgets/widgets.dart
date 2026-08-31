@@ -40,4 +40,5 @@ export 'super_grid.dart';
 export 'tab.dart';
 export 'text.dart';
 export 'theme.dart';
+export 'telegram_nav_icon.dart';
 export 'wave.dart';
